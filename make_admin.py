@@ -15,19 +15,22 @@ session at login, so an existing session keeps the old one.
 """
 
 import argparse
-import sqlite3
 import sys
 
-DB = "orders.db"
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+from database import get_db
 
 
 def connect():
     try:
-        conn = sqlite3.connect(DB)
-        conn.row_factory = sqlite3.Row
-        return conn
-    except sqlite3.Error as e:
-        sys.exit(f"Could not open {DB}: {e}\nRun this from the folder that contains app.py.")
+        return get_db()
+    except Exception as e:
+        sys.exit(f"Could not connect to the database: {e}\nRun this from the folder that contains app.py.")
 
 
 def show(conn):

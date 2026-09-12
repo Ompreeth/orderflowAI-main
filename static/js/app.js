@@ -295,11 +295,13 @@ async function confirmOrderFromPicker(invId, partName, availableStock, knownQty)
         return;
     }
 
+    const payment_method = confirm(`Payment method for this order:\nOK = Prepaid (pay now)\nCancel = Cash on Delivery`) ? "prepaid" : "cod";
+
     try {
         const res  = await fetch("/api/chat/confirm-order", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ inventory_id: invId, quantity: qty }),
+            body: JSON.stringify({ inventory_id: invId, quantity: qty, payment_method }),
         });
         const data = await res.json();
 
@@ -546,7 +548,7 @@ function renderBento(orders, inventory) {
     bentoTrend(orders, inventory);
     const sub = document.getElementById("bOrdersSub");
     if (sub) {
-        const open = orders.filter(o => o.status !== "Cancelled" && o.status !== "Accepted").length;
+        const open = orders.filter(o => !["Cancelled", "Returned", "Accepted"].includes(o.status)).length;
         sub.textContent = `${open} still open`;
     }
 }
@@ -869,7 +871,7 @@ function renderOrderPipeline(orders) {
     const host = document.getElementById("orderPipeline");
     if (!host) return;
 
-    const open = (orders || []).filter(o => o.status !== "Cancelled").slice(0, 5);
+    const open = (orders || []).filter(o => !["Cancelled", "Returned"].includes(o.status)).slice(0, 5);
     if (!open.length) {
         host.innerHTML = `<div class="ops-empty">No active orders.</div>`;
         return;
@@ -1018,17 +1020,23 @@ function renderOrders(orders) {
         return;
     }
     tbody.innerHTML = orders.map(o => {
-        const paymentCell = o.status === "Cancelled"
-            ? `<span style="color:var(--text-muted);font-size:11.5px">—</span>`
-            : o.paid
-                ? `<span class="badge badge-accepted"><span class="badge-dot"></span>Paid</span>`
-                : `<button class="po-action-btn primary" onclick="payOrder(${o.id})" title="Requires admin/operator login"><i class="ti ti-credit-card"></i> Collect</button>`;
+        const isTerminal = o.status === "Cancelled" || o.status === "Returned";
+        const isReturn   = o.status === "Accepted";
+        const methodTag  = `<span class="badge ${o.payment_method === "prepaid" ? "badge-review" : "badge-received"}" style="margin-right:6px;font-size:10.5px">${o.payment_method === "prepaid" ? "Prepaid" : "COD"}</span>`;
 
-        const actionsCell = o.status === "Cancelled"
+        const paymentCell = isTerminal
+            ? (o.refunded
+                ? `<span class="badge badge-cancelled"><span class="badge-dot"></span>Refunded</span>`
+                : `<span style="color:var(--text-muted);font-size:11.5px">—</span>`)
+            : o.paid
+                ? `${methodTag}<span class="badge badge-accepted"><span class="badge-dot"></span>Paid</span>`
+                : `${methodTag}<button class="po-action-btn primary" onclick="payOrder(${o.id})" title="Requires admin/operator login"><i class="ti ti-credit-card"></i> ${o.payment_method === "prepaid" ? "Charge Card" : "Collect Cash"}</button>`;
+
+        const actionsCell = isTerminal
             ? `<span style="color:var(--text-muted);font-size:11.5px">—</span>`
             : `<div style="display:flex;gap:6px">
                  <button class="icon-btn" onclick="openEditOrderModal(${o.id})" title="Edit order"><i class="ti ti-edit"></i></button>
-                 <button class="icon-btn" onclick="cancelOrderRow(${o.id})" title="Cancel order"><i class="ti ti-x"></i></button>
+                 <button class="icon-btn" onclick="cancelOrderRow(${o.id}, ${isReturn})" title="${isReturn ? 'Return order' : 'Cancel order'}"><i class="ti ti-${isReturn ? 'arrow-back-up' : 'x'}"></i></button>
                </div>`;
 
         return `
@@ -1071,7 +1079,7 @@ async function setOrderStatus(orderId, status, btn) {
 }
 
 function statusBadge(status) {
-    const map = { Received: "badge-received", "In Review": "badge-review", Accepted: "badge-accepted", Cancelled: "badge-cancelled" };
+    const map = { Received: "badge-received", "In Review": "badge-review", Accepted: "badge-accepted", Cancelled: "badge-cancelled", Returned: "badge-cancelled" };
     return `<span class="badge ${map[status] || "badge-received"}"><span class="badge-dot"></span>${status}</span>`;
 }
 
@@ -1095,6 +1103,7 @@ function openEditOrderModal(id) {
     document.getElementById("edit-order-qty").value = order.quantity ?? "";
     document.getElementById("edit-order-deadline").value = order.deadline || "";
     document.getElementById("edit-order-specs").value = order.specs || "";
+    document.getElementById("edit-order-payment-method").value = order.payment_method || "cod";
     document.getElementById("editOrderMsg").textContent = "";
     document.getElementById("editOrderModal").style.display = "flex";
 }
@@ -1112,6 +1121,7 @@ async function saveOrderEdit() {
         quantity: qtyVal ? parseInt(qtyVal) : undefined,
         deadline: document.getElementById("edit-order-deadline").value,
         specs:    document.getElementById("edit-order-specs").value,
+        payment_method: document.getElementById("edit-order-payment-method").value,
     };
     try {
         const res  = await fetch(`/api/orders/${editingOrderId}`, {
@@ -1131,12 +1141,14 @@ async function saveOrderEdit() {
     }
 }
 
-async function cancelOrderRow(id) {
-    if (!confirm(`Cancel order #${id}? This can't be undone.`)) return;
+async function cancelOrderRow(id, isReturn) {
+    const label = isReturn ? "Return" : "Cancel";
+    if (!confirm(`${label} order #${id}? Stock will be restocked and any payment refunded. This can't be undone.`)) return;
     try {
-        const res  = await fetch(`/api/orders/${id}/cancel`, { method: "POST" });
+        const res  = await fetch(`/api/orders/${id}/${isReturn ? "return" : "cancel"}`, { method: "POST" });
         const data = await res.json();
         if (!res.ok) { alert(data.message); return; }
+        alert(data.message);
         loadDashboard();
     } catch (err) {
         alert("Error: " + err.message);
@@ -2733,7 +2745,7 @@ async function loadPaymentHistory() {
         tbody.innerHTML = rows.map(p => `
             <tr>
                 <td class="mono">#${p.id}</td>
-                <td>${p.direction === "incoming" ? "⬇️ Incoming" : "⬆️ Outgoing"}</td>
+                <td>${p.direction === "incoming" ? "⬇️ Incoming" : p.direction === "refund" ? "↩️ Refund" : "⬆️ Outgoing"}</td>
                 <td>${escapeHtml(p.reference_type)} #${p.reference_id}</td>
                 <td>$${(p.amount || 0).toFixed(2)}</td>
                 <td>${escapeHtml(p.provider)}</td>
@@ -3098,7 +3110,7 @@ async function loadReports() {
             fulfillment.avg_fulfillment_days ?? "—";
         document.getElementById("repStatMeasured").innerText = fulfillment.measured_orders;
         const openCount = Object.entries(fulfillment.status_counts)
-            .filter(([status]) => status !== "Accepted" && status !== "Cancelled")
+            .filter(([status]) => !["Accepted", "Cancelled", "Returned"].includes(status))
             .reduce((sum, [, c]) => sum + c, 0);
         document.getElementById("repStatOpen").innerText = openCount;
 
@@ -3152,7 +3164,7 @@ function renderOldestOpenTable(rows) {
     const tbody = document.getElementById("oldestOpenTableBody");
     if (!tbody) return;
     if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No open orders — everything's Accepted or Cancelled.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="table-empty">No open orders — everything's Accepted, Cancelled, or Returned.</td></tr>`;
         return;
     }
     tbody.innerHTML = rows.map(o => `

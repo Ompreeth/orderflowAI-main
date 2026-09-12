@@ -1,0 +1,7 @@
+# Extra dependencies for the desktop-app wrapper (desktop.py) and building
+# the standalone .exe. Not needed for the plain web-server workflow
+# (python app.py + browser) — install with:
+#   pip install -r requirements.txt -r requirements-desktop.txt
+pywebview>=5.0
+pythonnet>=3.0
+pyinstaller>=6.0

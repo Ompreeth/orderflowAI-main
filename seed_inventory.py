@@ -6,6 +6,13 @@ work with (dashboard, orders, scans, reports, etc.).
 Safe to re-run: it skips any part_name that already exists.
 """
 from datetime import datetime
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from database import get_db, init_db
 
 ITEMS = [

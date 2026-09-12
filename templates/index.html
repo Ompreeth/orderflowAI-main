@@ -260,6 +260,13 @@
         <label>Specs</label>
         <input id="edit-order-specs" class="scanner-input" placeholder="Optional specifications" />
       </div>
+      <div class="modal-field">
+        <label>Payment Method</label>
+        <select id="edit-order-payment-method" class="scanner-input">
+          <option value="cod">Cash on Delivery</option>
+          <option value="prepaid">Prepaid</option>
+        </select>
+      </div>
       <div class="modal-actions">
         <button class="btn-primary" onclick="saveOrderEdit()"><i class="ti ti-check"></i> Save Changes</button>
         <span id="editOrderMsg" style="font-size:12.5px"></span>

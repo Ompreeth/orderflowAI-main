@@ -12,11 +12,12 @@ ERP/accounting systems, and scheduled SQLite backups.
   so the receiver can verify it actually came from here. Every attempt
   is logged; a failed or unreachable endpoint never blocks the action
   that triggered it, same principle as notifications.
-- Backups: a daemon thread copies orders.db on an interval
-  (BACKUP_INTERVAL_HOURS, default 24) and prunes old copies beyond
+- Backups: a daemon thread runs `pg_dump` on an interval
+  (BACKUP_INTERVAL_HOURS, default 24) and prunes old dumps beyond
   BACKUP_RETENTION_COUNT (default 14), plus a manual "back up now" and a
   download list. Guarded against double-starting under Flask's debug
-  reloader, which runs this module's import twice.
+  reloader, which runs this module's import twice. Requires the Postgres
+  client tools (pg_dump) to be installed and on PATH.
 """
 
 import glob
@@ -25,6 +26,7 @@ import hmac
 import io
 import json
 import os
+import subprocess
 import threading
 import time
 from datetime import datetime
@@ -32,7 +34,7 @@ from datetime import datetime
 import requests
 from flask import Blueprint, request, jsonify, send_file
 
-from database import get_db, DB_NAME
+from database import get_db, DATABASE_URL
 
 integrations_bp = Blueprint("integrations", __name__)
 
@@ -246,19 +248,18 @@ def _safe_backup_name(name):
 def backup_db():
     try:
         os.makedirs(BACKUP_DIR, exist_ok=True)
-        if not os.path.exists(DB_NAME):
-            return None
         stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        dest = os.path.join(BACKUP_DIR, f"orders_{stamp}.db")
+        dest = os.path.join(BACKUP_DIR, f"orders_{stamp}.sql")
 
-        conn = get_db()
-        backup_conn = __import__("sqlite3").connect(dest)
-        conn.backup(backup_conn)
-        backup_conn.close()
-        conn.close()
+        result = subprocess.run(
+            ["pg_dump", DATABASE_URL, "-f", dest],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "pg_dump exited non-zero")
 
         # Retention: keep only the newest BACKUP_RETENTION_COUNT files
-        existing = sorted(glob.glob(os.path.join(BACKUP_DIR, "orders_*.db")))
+        existing = sorted(glob.glob(os.path.join(BACKUP_DIR, "orders_*.sql")))
         for old in existing[:-BACKUP_RETENTION_COUNT] if BACKUP_RETENTION_COUNT > 0 else []:
             try:
                 os.remove(old)
@@ -294,7 +295,7 @@ def start_backup_scheduler():
 @integrations_bp.route("/api/backups", methods=["GET"])
 def list_backups():
     os.makedirs(BACKUP_DIR, exist_ok=True)
-    files = sorted(glob.glob(os.path.join(BACKUP_DIR, "orders_*.db")), reverse=True)
+    files = sorted(glob.glob(os.path.join(BACKUP_DIR, "orders_*.sql")), reverse=True)
     out = [{"filename": os.path.basename(f), "size_bytes": os.path.getsize(f),
             "created_at": datetime.fromtimestamp(os.path.getmtime(f)).isoformat()} for f in files]
     return jsonify(out)

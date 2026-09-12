@@ -1,17 +1,83 @@
-import sqlite3
-from datetime import datetime
+import os
+import re
 
-DB_NAME = "orders.db"
+import psycopg2
+import psycopg2.extras
+import psycopg2.extensions
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. Point it at your Postgres connection string "
+        "(e.g. Neon's 'Pooled connection' string) in the environment or .env file."
+    )
+
+_INSERT_RE = re.compile(r"^\s*insert\s+into\s+", re.IGNORECASE)
+
+
+class _Cursor:
+    """Wraps a psycopg2 cursor to add a settable .lastrowid, mirroring
+    sqlite3's cursor attribute. psycopg2's own .lastrowid always reads as
+    None (it's derived from table OIDs, which Postgres tables don't have
+    by default), so every INSERT call site across this app that reads
+    cur.lastrowid needs this populated some other way — see _Connection.execute."""
+
+    def __init__(self, cur):
+        self._cur = cur
+        self.lastrowid = None
+
+    def __getattr__(self, name):
+        return getattr(self._cur, name)
+
+    def __iter__(self):
+        return iter(self._cur)
+
+
+class _Connection(psycopg2.extensions.connection):
+    """A psycopg2 connection with an sqlite3-style .execute() shortcut, so
+    the rest of the app (written against sqlite3's conn.execute(...) API)
+    doesn't need touching. Translates '?' placeholders to psycopg2's '%s',
+    sqlite's SELECT last_insert_rowid() to Postgres's SELECT lastval()
+    (both are per-connection/session, so the semantics match as long as the
+    call happens on the same connection right after the INSERT, which is
+    how every call site here uses it), and auto-appends RETURNING id to
+    INSERT statements so cur.lastrowid (see _Cursor above) works the way
+    every call site expects. Every table in this schema has an `id`
+    primary key and every INSERT here inserts a single row, so this is
+    safe to do unconditionally rather than needing per-call-site changes."""
+
+    def execute(self, sql, params=None):
+        if sql.strip().rstrip(";").lower() == "select last_insert_rowid()":
+            sql = "SELECT lastval()"
+        else:
+            sql = sql.replace("?", "%s")
+
+        is_insert = _INSERT_RE.match(sql) and "returning" not in sql.lower()
+        if is_insert:
+            sql = sql + " RETURNING id"
+
+        raw_cur = self.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        raw_cur.execute(sql, params)
+
+        cur = _Cursor(raw_cur)
+        if is_insert:
+            row = raw_cur.fetchone()
+            if row is not None:
+                cur.lastrowid = row[0]
+        return cur
 
 
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DATABASE_URL, connection_factory=_Connection)
     return conn
 
 
 def _column_names(conn, table):
-    return [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    rows = conn.execute(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = ?",
+        (table,),
+    ).fetchall()
+    return [r["column_name"] for r in rows]
 
 
 def _add_column_if_missing(conn, table, column, ddl):
@@ -27,7 +93,7 @@ def init_db():
     # ── Inventory catalog ────────────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS inventory (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         part_name   TEXT NOT NULL,
         material    TEXT,
         unit        TEXT DEFAULT 'pcs',
@@ -42,7 +108,7 @@ def init_db():
     # ── Orders — always tied to an inventory item ────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS orders (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        id              SERIAL PRIMARY KEY,
         inventory_id    INTEGER,
         part_name       TEXT NOT NULL,
         material        TEXT,
@@ -58,7 +124,7 @@ def init_db():
     # ── Quality logs ─────────────────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS quality_logs (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         order_id    INTEGER,
         note        TEXT,
         log_time    TEXT,
@@ -69,7 +135,7 @@ def init_db():
     # ── Scan events (RFID / barcode) ─────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS scan_events (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        id              SERIAL PRIMARY KEY,
         inventory_id    INTEGER,
         scan_type       TEXT,
         tag_value       TEXT,
@@ -83,7 +149,7 @@ def init_db():
     # ── Production plans (demand management) ─────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS production_plans (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        id           SERIAL PRIMARY KEY,
         inventory_id INTEGER,
         part_name    TEXT NOT NULL,
         target_qty   INTEGER NOT NULL,
@@ -99,7 +165,7 @@ def init_db():
     # ── Suppliers (demand management) ─────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS suppliers (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        id           SERIAL PRIMARY KEY,
         name         TEXT NOT NULL,
         inventory_id INTEGER,
         part_name    TEXT,
@@ -115,7 +181,7 @@ def init_db():
     # ── Users & roles ──────────────────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS users (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        id            SERIAL PRIMARY KEY,
         username      TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         role          TEXT NOT NULL DEFAULT 'operator',
@@ -126,7 +192,7 @@ def init_db():
     # ── Audit log ──────────────────────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS audit_log (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         username    TEXT,
         action      TEXT NOT NULL,
         entity_type TEXT,
@@ -139,7 +205,7 @@ def init_db():
     # ── Purchase orders (to suppliers — distinct from sales `orders`) ──
     conn.execute("""
     CREATE TABLE IF NOT EXISTS purchase_orders (
-        id             INTEGER PRIMARY KEY AUTOINCREMENT,
+        id             SERIAL PRIMARY KEY,
         supplier_id    INTEGER,
         inventory_id   INTEGER,
         part_name      TEXT NOT NULL,
@@ -161,7 +227,7 @@ def init_db():
     # ── Payments (covers both outgoing-to-supplier and incoming-from-customer) ──
     conn.execute("""
     CREATE TABLE IF NOT EXISTS payments (
-        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        id                  SERIAL PRIMARY KEY,
         direction           TEXT NOT NULL,
         reference_type      TEXT NOT NULL,
         reference_id        INTEGER NOT NULL,
@@ -179,7 +245,7 @@ def init_db():
     # ── Bill of materials: finished inventory item -> component inventory items ──
     conn.execute("""
     CREATE TABLE IF NOT EXISTS bom (
-        id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+        id                    SERIAL PRIMARY KEY,
         parent_inventory_id   INTEGER NOT NULL,
         component_inventory_id INTEGER NOT NULL,
         qty_per_unit          REAL NOT NULL DEFAULT 1,
@@ -189,10 +255,21 @@ def init_db():
     )
     """)
 
+    # ── Machines / work centers ─────────────────────────────
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS machines (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT NOT NULL,
+        location    TEXT,
+        status      TEXT DEFAULT 'running',
+        created_at  TEXT
+    )
+    """)
+
     # ── Work orders (shop-floor production jobs) ───────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS work_orders (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        id              SERIAL PRIMARY KEY,
         inventory_id    INTEGER,
         part_name       TEXT NOT NULL,
         quantity        INTEGER NOT NULL,
@@ -207,21 +284,10 @@ def init_db():
     )
     """)
 
-    # ── Machines / work centers ─────────────────────────────
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS machines (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
-        name        TEXT NOT NULL,
-        location    TEXT,
-        status      TEXT DEFAULT 'running',
-        created_at  TEXT
-    )
-    """)
-
     # ── Machine downtime log ────────────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS machine_downtime (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         machine_id  INTEGER NOT NULL,
         reason      TEXT,
         started_at  TEXT,
@@ -233,7 +299,7 @@ def init_db():
     # ── Warehouses / locations ───────────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS warehouses (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         name        TEXT NOT NULL,
         address     TEXT,
         created_at  TEXT
@@ -244,7 +310,7 @@ def init_db():
     #    single-location default / grand total when this table is unused) ────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS inventory_locations (
-        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        id            SERIAL PRIMARY KEY,
         inventory_id  INTEGER NOT NULL,
         warehouse_id  INTEGER NOT NULL,
         quantity      INTEGER DEFAULT 0,
@@ -258,7 +324,7 @@ def init_db():
     # ── Notification settings + delivery log ─────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS notification_settings (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         channel     TEXT NOT NULL,
         target      TEXT,
         event_type  TEXT NOT NULL,
@@ -269,7 +335,7 @@ def init_db():
 
     conn.execute("""
     CREATE TABLE IF NOT EXISTS notification_log (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         channel     TEXT NOT NULL,
         event_type  TEXT,
         recipient   TEXT,
@@ -282,7 +348,7 @@ def init_db():
     # ── Saved dashboard views/filters ─────────────────────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS saved_views (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         username    TEXT,
         view_name   TEXT NOT NULL,
         view_type   TEXT,
@@ -294,7 +360,7 @@ def init_db():
     # ── Outbound webhooks (ERP/accounting integration) ─────────
     conn.execute("""
     CREATE TABLE IF NOT EXISTS webhooks (
-        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        id          SERIAL PRIMARY KEY,
         url         TEXT NOT NULL,
         event_type  TEXT NOT NULL,
         secret      TEXT,
@@ -305,7 +371,7 @@ def init_db():
 
     conn.execute("""
     CREATE TABLE IF NOT EXISTS webhook_log (
-        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        id              SERIAL PRIMARY KEY,
         webhook_id      INTEGER,
         event_type      TEXT,
         status_code     INTEGER,
@@ -341,5 +407,14 @@ def init_db():
     # Profile view shows "last login"; NULL just means "never logged in
     # since this column existed" for pre-existing accounts.
     _add_column_if_missing(conn, "users", "last_login", "TEXT")
+
+    # Cash-on-delivery vs prepaid, chosen at order time. Existing/chat-created
+    # orders default to 'cod' since there's no upfront charge to reconcile.
+    _add_column_if_missing(conn, "orders", "payment_method", "TEXT DEFAULT 'cod'")
+
+    # Links a refund payments row back to the payment it reverses, so a
+    # payment can be checked for "already refunded" without guessing from
+    # amount/timing alone.
+    _add_column_if_missing(conn, "payments", "refund_of_payment_id", "INTEGER")
 
     conn.close()

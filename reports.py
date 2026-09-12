@@ -168,7 +168,7 @@ def _fulfillment_metrics(conn):
 
     oldest_open = conn.execute("""
         SELECT id, part_name, status, created_at, deadline FROM orders
-        WHERE status NOT IN ('Accepted', 'Cancelled')
+        WHERE status NOT IN ('Accepted', 'Cancelled', 'Returned')
         ORDER BY created_at ASC LIMIT 10
     """).fetchall()
 

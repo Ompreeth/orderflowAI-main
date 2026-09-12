@@ -1,11 +1,10 @@
 from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
-from database import get_db, init_db
 
 import os
 import sys
 import secrets
-import sqlite3
+import psycopg2
 import requests
 import json
 import re
@@ -24,9 +23,10 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
-# Load .env (SMTP_*, TWILIO_*, SLACK_WEBHOOK_URL, SECRET_KEY, OLLAMA_*, …) into
-# the environment before any blueprint import — notifications.py reads these at
-# import time, so this has to run first. No-op if python-dotenv isn't installed
+# Load .env (DATABASE_URL, SMTP_*, TWILIO_*, SLACK_WEBHOOK_URL, SECRET_KEY,
+# OLLAMA_*, …) into the environment before any local module import — both
+# database.py (DATABASE_URL) and notifications.py read these at import
+# time, so this has to run first. No-op if python-dotenv isn't installed
 # or there's no .env file.
 try:
     from dotenv import load_dotenv
@@ -34,6 +34,7 @@ try:
 except ImportError:
     pass
 
+from database import get_db, init_db
 from auth import auth_bp, bootstrap_admin
 from procurement import procurement_bp, _best_supplier_for, _create_po_row
 from payments import payments_bp
@@ -47,7 +48,13 @@ from search import search_bp
 from saved_views import saved_views_bp
 from inventory_io import inventory_io_bp
 
-app = Flask(__name__)
+# templates/ and static/ resolve relative to this file normally, but once
+# PyInstaller frozen (desktop.py), everything is unpacked into a temp
+# sys._MEIPASS dir at runtime instead — this makes both cases work.
+_base_path = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__,
+            template_folder=os.path.join(_base_path, "templates"),
+            static_folder=os.path.join(_base_path, "static"))
 CORS(app, supports_credentials=True)
 
 # Session signing key — set SECRET_KEY in the environment so logins survive
@@ -350,8 +357,8 @@ def answer_report_query(text: str):
         conn = get_db()
         m = _fulfillment_metrics(conn)
         conn.close()
-        open_count = sum(c for s, c in m["status_counts"].items() if s not in ("Accepted", "Cancelled"))
-        return f"📊 {open_count} order(s) currently open (not yet Accepted or Cancelled)."
+        open_count = sum(c for s, c in m["status_counts"].items() if s not in ("Accepted", "Cancelled", "Returned"))
+        return f"📊 {open_count} order(s) currently open (not yet Accepted, Cancelled, or Returned)."
 
     if any(p in t for p in ("best supplier", "top supplier", "supplier scorecard", "which supplier is best")):
         conn = get_db()
@@ -505,7 +512,8 @@ def add_inventory_item():
             "message": f"✅ '{data['part_name']}' added to inventory as item #{new_id}",
             "id": new_id,
         })
-    except sqlite3.IntegrityError as e:
+    except psycopg2.errors.UniqueViolation as e:
+        conn.rollback()
         conn.close()
         return jsonify({"message": f"❌ Error: {e} — RFID tag or barcode may already exist"}), 400
 
@@ -561,6 +569,11 @@ def set_order_status(oid):
         conn.close()
         return jsonify({"message": "Order not found"}), 404
 
+    if row["status"] in ("Cancelled", "Returned"):
+        conn.close()
+        return jsonify({"message": f"❌ Order #{oid} is {row['status'].lower()} — its stock has already "
+                                    f"been restored, so its status can't be changed"}), 400
+
     conn.execute("UPDATE orders SET status = ?, updated_at = ? WHERE id = ?",
                  (canonical, datetime.now().isoformat(), oid))
     conn.commit()
@@ -578,8 +591,19 @@ def get_orders():
         SELECT o.*,
                EXISTS(
                    SELECT 1 FROM payments p
-                   WHERE p.reference_type = 'order' AND p.reference_id = o.id AND p.status = 'succeeded'
-               ) AS paid
+                   WHERE p.reference_type = 'order' AND p.reference_id = o.id
+                     AND p.direction = 'incoming' AND p.status = 'succeeded'
+               )
+               AND NOT EXISTS(
+                   SELECT 1 FROM payments p
+                   WHERE p.reference_type = 'order' AND p.reference_id = o.id
+                     AND p.direction = 'refund' AND p.status = 'succeeded'
+               ) AS paid,
+               EXISTS(
+                   SELECT 1 FROM payments p
+                   WHERE p.reference_type = 'order' AND p.reference_id = o.id
+                     AND p.direction = 'refund' AND p.status = 'succeeded'
+               ) AS refunded
         FROM orders o
         ORDER BY o.id DESC
     """).fetchall()
@@ -910,8 +934,8 @@ def chat():
 
             conn.execute("""
                 INSERT INTO orders
-                    (inventory_id, part_name, material, quantity, specs, deadline, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'Received', ?)
+                    (inventory_id, part_name, material, quantity, specs, deadline, status, payment_method, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'Received', 'cod', ?)
             """, (
                 inv_row["id"],
                 inv_row["part_name"],
@@ -1146,6 +1170,9 @@ def confirm_order():
     data   = request.get_json(silent=True) or {}
     inv_id = data.get("inventory_id")
     qty    = int(data.get("quantity") or 1)
+    payment_method = data.get("payment_method")
+    if payment_method not in ("cod", "prepaid"):
+        payment_method = "cod"
 
     if not inv_id:
         return jsonify({"message": "inventory_id is required"}), 400
@@ -1170,8 +1197,9 @@ def confirm_order():
         }), 400
 
     conn.execute(
-        "INSERT INTO orders (inventory_id, part_name, material, quantity, specs, deadline, status, created_at) VALUES (?, ?, ?, ?, \'\', \'\', \'Received\', ?)",
-        (inv_row["id"], inv_row["part_name"], inv_row["material"], qty, datetime.now().isoformat()),
+        "INSERT INTO orders (inventory_id, part_name, material, quantity, specs, deadline, status, payment_method, created_at) "
+        "VALUES (?, ?, ?, ?, \'\', \'\', \'Received\', ?, ?)",
+        (inv_row["id"], inv_row["part_name"], inv_row["material"], qty, payment_method, datetime.now().isoformat()),
     )
     conn.commit()
     new_id  = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
@@ -1229,11 +1257,11 @@ def demand_forecast():
     result = []
     for item in items:
         rows = conn.execute("""
-            SELECT DATE(scanned_at) as day, SUM(qty_consumed) as total
+            SELECT DATE(scanned_at::timestamp) as day, SUM(qty_consumed) as total
             FROM   scan_events
             WHERE  inventory_id = ?
-              AND  scanned_at >= DATE('now', '-30 days')
-            GROUP  BY DATE(scanned_at)
+              AND  scanned_at::timestamp >= NOW() - INTERVAL '30 days'
+            GROUP  BY DATE(scanned_at::timestamp)
             ORDER  BY day
         """, (item["id"],)).fetchall()
 
@@ -1428,10 +1456,10 @@ def gap_analysis():
     for item in items:
         row = conn.execute("""
             SELECT COALESCE(SUM(qty_consumed), 0) as total,
-                   COUNT(DISTINCT DATE(scanned_at))  as active_days
+                   COUNT(DISTINCT DATE(scanned_at::timestamp))  as active_days
             FROM   scan_events
             WHERE  inventory_id = ?
-              AND  scanned_at  >= DATE('now', '-30 days')
+              AND  scanned_at::timestamp  >= NOW() - INTERVAL '30 days'
         """, (item["id"],)).fetchone()
 
         total_consumed   = row["total"]
@@ -1553,13 +1581,13 @@ def demand_predictions():
         # ── 1. Pull raw daily consumption for last 60 days ──────────
         rows = conn.execute("""
             SELECT
-                CAST(julianday('now') - julianday(DATE(scanned_at)) AS INTEGER) AS days_ago,
-                DATE(scanned_at)   AS day,
+                CAST(CURRENT_DATE - DATE(scanned_at::timestamp) AS INTEGER) AS days_ago,
+                DATE(scanned_at::timestamp)   AS day,
                 SUM(qty_consumed)  AS consumed
             FROM scan_events
             WHERE inventory_id = ?
-              AND scanned_at >= DATE('now', '-60 days')
-            GROUP BY DATE(scanned_at)
+              AND scanned_at::timestamp >= NOW() - INTERVAL '60 days'
+            GROUP BY DATE(scanned_at::timestamp)
             ORDER BY day ASC
         """, (item["id"],)).fetchall()
 

@@ -20,6 +20,9 @@ from flask import Blueprint, request, jsonify, session
 
 from database import get_db
 from auth import login_required, role_required, log_audit
+from payments import refund_order_payment
+from notifications import notify
+from integrations import dispatch_webhook
 
 procurement_bp = Blueprint("procurement", __name__)
 
@@ -59,7 +62,7 @@ def _best_supplier_for(conn, inventory_id):
     if not ranked:
         return None
     best = ranked[0]
-    # Re-fetch as a sqlite3.Row so callers can keep using row['col'] access
+    # Re-fetch as a DB row so callers can keep using row['col'] access
     return conn.execute("SELECT * FROM suppliers WHERE id = ?", (best["id"],)).fetchone()
 
 
@@ -350,6 +353,7 @@ def edit_order(oid):
     quantity = data.get("quantity", order["quantity"])
     deadline = data.get("deadline", order["deadline"])
     specs = data.get("specs", order["specs"])
+    payment_method = data.get("payment_method", order["payment_method"])
     try:
         if quantity is not None:
             quantity = int(quantity)
@@ -358,24 +362,75 @@ def edit_order(oid):
         conn.close()
         return jsonify({"message": "❌ quantity must be a positive integer"}), 400
 
-    conn.execute("UPDATE orders SET quantity=?, deadline=?, specs=?, updated_at=? WHERE id=?",
-                 (quantity, deadline, specs, datetime.now().isoformat(), oid))
+    if payment_method not in ("cod", "prepaid"):
+        conn.close()
+        return jsonify({"message": "❌ payment_method must be 'cod' or 'prepaid'"}), 400
+
+    conn.execute("UPDATE orders SET quantity=?, deadline=?, specs=?, payment_method=?, updated_at=? WHERE id=?",
+                 (quantity, deadline, specs, payment_method, datetime.now().isoformat(), oid))
     conn.commit()
     conn.close()
     log_audit("edit_order", "order", oid, f"qty={quantity} deadline={deadline}")
     return jsonify({"message": f"✅ Order #{oid} updated"})
 
 
-@procurement_bp.route("/api/orders/<int:oid>/cancel", methods=["POST"])
-def cancel_order(oid):
+def _terminate_order(oid, terminal_status):
+    """Shared by /cancel and /return — same action (stop the order, put the
+    stock back, refund whatever was paid), just gated on a different
+    starting status. Cancel is for an order that never shipped; Return is
+    for one that already reached Accepted."""
     conn = get_db()
     order = conn.execute("SELECT * FROM orders WHERE id = ?", (oid,)).fetchone()
     if not order:
         conn.close()
         return jsonify({"message": "Not found"}), 404
-    conn.execute("UPDATE orders SET status='Cancelled', updated_at=? WHERE id=?",
-                 (datetime.now().isoformat(), oid))
+
+    if order["status"] in ("Cancelled", "Returned"):
+        conn.close()
+        return jsonify({"message": f"❌ Order #{oid} is already {order['status'].lower()}"}), 400
+
+    if terminal_status == "Returned" and order["status"] != "Accepted":
+        conn.close()
+        return jsonify({"message": "❌ Only an Accepted order can be returned — use Cancel instead"}), 400
+    if terminal_status == "Cancelled" and order["status"] == "Accepted":
+        conn.close()
+        return jsonify({"message": "❌ This order already shipped — use Return instead of Cancel"}), 400
+
+    if order["inventory_id"]:
+        conn.execute("UPDATE inventory SET quantity = quantity + ? WHERE id = ?",
+                     (order["quantity"], order["inventory_id"]))
+
+    refund = refund_order_payment(conn, oid, session.get("username", "guest"))
+
+    conn.execute("UPDATE orders SET status=?, updated_at=? WHERE id=?",
+                 (terminal_status, datetime.now().isoformat(), oid))
     conn.commit()
     conn.close()
-    log_audit("cancel_order", "order", oid)
-    return jsonify({"message": f"✅ Order #{oid} cancelled"})
+
+    action = "cancel_order" if terminal_status == "Cancelled" else "return_order"
+    log_audit(action, "order", oid, f"refunded=${refund['amount']}" if refund else "no refund")
+
+    refund_msg = ""
+    if refund:
+        refund_msg = f" ${refund['amount']:,.2f} refunded." if refund["status"] == "succeeded" \
+            else f" Refund attempt failed: {refund['error'] or 'unknown error'}."
+
+    verb = "cancelled" if terminal_status == "Cancelled" else "returned"
+    notify("order_status_change", f"Order #{oid} ({order['part_name']}): {order['status']} → {terminal_status}")
+    dispatch_webhook("order_status_change", {"order_id": oid, "part_name": order["part_name"],
+                                              "old_status": order["status"], "new_status": terminal_status})
+
+    return jsonify({
+        "message": f"✅ Order #{oid} {verb} — stock restored.{refund_msg}",
+        "status": terminal_status,
+    })
+
+
+@procurement_bp.route("/api/orders/<int:oid>/cancel", methods=["POST"])
+def cancel_order(oid):
+    return _terminate_order(oid, "Cancelled")
+
+
+@procurement_bp.route("/api/orders/<int:oid>/return", methods=["POST"])
+def return_order(oid):
+    return _terminate_order(oid, "Returned")

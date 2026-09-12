@@ -75,6 +75,60 @@ def _process_payment(amount, currency, description):
         return "succeeded", "demo", f"demo_{uuid.uuid4().hex[:16]}", None
 
 
+def _process_refund(provider, provider_payment_id, amount):
+    """Returns (status, provider, provider_refund_id, error_message).
+    Mirrors _process_payment above — same demo-mode-when-no-Stripe-key
+    behavior, so refunds are just as testable with zero setup."""
+    if _stripe and provider == "stripe" and provider_payment_id:
+        try:
+            refund = _stripe.Refund.create(
+                payment_intent=provider_payment_id,
+                amount=int(round(amount * 100)),
+            )
+            status = "succeeded" if refund.status in ("succeeded", "pending") else refund.status
+            return status, "stripe", refund.id, None
+        except Exception as e:
+            return "failed", "stripe", None, str(e)
+    else:
+        return "succeeded", "demo", f"demo_refund_{uuid.uuid4().hex[:16]}", None
+
+
+def refund_order_payment(conn, order_id, created_by):
+    """Refund whatever was collected on a sales order, in full. Used by both
+    the cancel/return flow (procurement.py) and the standalone refund route
+    below. Returns None if there's nothing to refund (e.g. an unpaid COD
+    order), otherwise a dict describing the refund."""
+    payment = conn.execute("""
+        SELECT * FROM payments
+        WHERE reference_type = 'order' AND reference_id = ?
+          AND direction = 'incoming' AND status = 'succeeded'
+          AND NOT EXISTS (
+              SELECT 1 FROM payments r
+              WHERE r.direction = 'refund' AND r.status = 'succeeded'
+                AND r.refund_of_payment_id = payments.id
+          )
+        ORDER BY id DESC LIMIT 1
+    """, (order_id,)).fetchone()
+
+    if not payment:
+        return None
+
+    status, provider, refund_id, error = _process_refund(
+        payment["provider"], payment["provider_payment_id"], payment["amount"]
+    )
+    now = datetime.now().isoformat()
+    conn.execute("""
+        INSERT INTO payments (direction, reference_type, reference_id, amount, currency,
+                               provider, provider_payment_id, status, created_by, created_at,
+                               updated_at, refund_of_payment_id)
+        VALUES ('refund', 'order', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (order_id, payment["amount"], payment["currency"], provider, refund_id,
+          status, created_by, now, now, payment["id"]))
+    conn.commit()
+
+    return {"amount": payment["amount"], "status": status, "error": error}
+
+
 # ─────────────────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────────────────
@@ -194,3 +248,30 @@ def pay_sales_order(order_id):
         })
     return jsonify({"message": f"❌ Payment failed: {error or 'unknown error'}",
                      "payment_id": payment_id, "status": status}), 402
+
+
+@payments_bp.route("/api/payments/order/<int:order_id>/refund", methods=["POST"])
+@role_required("admin", "operator")
+def refund_sales_order(order_id):
+    """Standalone/goodwill refund — outside of cancelling or returning the
+    order itself (those call refund_order_payment directly). Useful when an
+    order stays Accepted but the customer still needs their money back."""
+    conn = get_db()
+    order = conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+    if not order:
+        conn.close()
+        return jsonify({"message": "Order not found"}), 404
+
+    result = refund_order_payment(conn, order_id, session.get("username", "guest"))
+    conn.close()
+
+    if not result:
+        return jsonify({"message": "❌ Nothing to refund — this order hasn't been paid"}), 400
+
+    log_audit("refund_order", "order", order_id, f"${result['amount']} — {result['status']}")
+
+    if result["status"] == "succeeded":
+        return jsonify({"message": f"✅ Refunded ${result['amount']:,.2f} for order #{order_id}",
+                         "status": result["status"]})
+    return jsonify({"message": f"❌ Refund failed: {result['error'] or 'unknown error'}",
+                     "status": result["status"]}), 402

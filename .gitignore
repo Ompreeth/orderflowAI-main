@@ -7,3 +7,8 @@ __pycache__/
 
 # Local runtime database
 orders.db
+
+# PyInstaller build output (dist/ includes a copied .env with real secrets)
+build/
+dist/
+*.spec
