@@ -1,0 +1,111 @@
+/* ============================================================
+   OrderFlow AI — slide-out navigation shell
+   ------------------------------------------------------------
+   Turns the always-visible sidebar into a drawer that slides in
+   over the content, and puts a hamburger + logo badge + two-line
+   title in its place, matching the reference layout.
+
+   Remove the <link> in templates/index.html to get the fixed
+   sidebar back — style.css is untouched.
+   ============================================================ */
+
+/* ── The sidebar becomes an overlay drawer ─────────────────── */
+.sidebar {
+  position: fixed;
+  top: 0; bottom: 0; left: 0;
+  z-index: 60;
+  width: var(--sidebar-w);
+  transform: translateX(-100%);
+  transition: transform 0.26s cubic-bezier(.4, 0, .2, 1);
+  will-change: transform;
+}
+body.nav-open .sidebar {
+  transform: translateX(0);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Scrim behind the open drawer — click anywhere to close. */
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: var(--overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.26s cubic-bezier(.4, 0, .2, 1);
+  border: 0;
+  padding: 0;
+}
+body.nav-open .nav-scrim { opacity: 1; pointer-events: auto; }
+
+/* With the drawer out of flow, the panel takes the full width. */
+.main-panel { width: 100%; }
+.main-panel > .view.active {
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* ── Top bar ───────────────────────────────────────────────── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  padding: 14px 28px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.icon-circle {
+  width: 42px; height: 42px;
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--border-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 18px;
+  cursor: pointer;
+  transition: all var(--ease);
+}
+.icon-circle:hover { background: var(--bg-raised); border-color: var(--border-strong); }
+
+/* Black circular badge, as in the reference. */
+.brand-badge {
+  width: 42px; height: 42px;
+  flex: none;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #14100e;
+  color: #ffffff;
+  font-size: 17px;
+}
+:root:not([data-theme="light"]) .brand-badge {
+  background: var(--brand);
+  color: #14100e;
+}
+
+.brand-stack { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.brand-line1 {
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.brand-line2 {
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+/* The panel headers already name the view, so hide their titles on
+   wide screens to avoid saying it twice — keep the subtitle. */
+.top-bar + .view .panel-header .panel-title,
+.main-panel .view .panel-header .panel-title { font-size: 20px; }
+
+@media (max-width: 760px) {
+  .top-bar { padding: 12px 16px; gap: 10px; }
+  .icon-circle, .brand-badge { width: 38px; height: 38px; font-size: 16px; }
+  .brand-line1 { font-size: 14px; }
+  .brand-line2 { font-size: 12px; }
+}

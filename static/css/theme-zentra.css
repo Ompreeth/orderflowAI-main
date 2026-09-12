@@ -1,0 +1,265 @@
+/* ============================================================
+   OrderFlow AI — "Zentra" light theme
+   ------------------------------------------------------------
+   Loaded after style.css and theme-violet.css. Everything here is
+   scoped to :root[data-theme="light"], so:
+
+       light mode  ->  this theme (white cards, warm-grey page,
+                       big muted KPI numbers, amber accent)
+       dark  mode  ->  the violet theme, untouched
+
+   The existing Dark/Light toggle therefore switches between two
+   finished designs rather than dimming one. Remove the <link> in
+   templates/index.html to drop back to the stock light theme.
+   ============================================================ */
+
+:root[data-theme="light"] {
+  /* ── surfaces: warm off-white page, pure white cards ───── */
+  --bg-app:        #f6f5f3;
+  --bg-sidebar:    #ffffff;
+  --bg-panel:      #ffffff;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #fafaf9;
+  --bg-raised:     #f5f5f4;
+  --bg-input:      #ffffff;
+  --bg-hover:      rgba(12,10,9,0.04);
+  --bg-active:     rgba(12,10,9,0.07);
+  --overlay:       rgba(28,25,23,0.45);
+
+  /* ── borders: hairline warm grey, cards read by edge ──── */
+  --border:        #e7e5e4;
+  --border-md:     #d6d3d1;
+  --border-strong: #a8a29e;
+
+  /* ── text: near-black headline, warm greys beneath ────── */
+  --text-primary:   #0c0a09;
+  --text-secondary: #57534e;
+  --text-muted:     #8f8880;
+  --text-faint:     #c4bfba;
+
+  /* ── brand: amber ─────────────────────────────────────── */
+  --brand:         #ea6a1e;
+  --brand-hover:   #f47b32;
+  --brand-press:   #c85512;
+  --brand-dim:     rgba(234,106,30,0.10);
+  --brand-border:  rgba(234,106,30,0.34);
+  --brand-text:    #b8500f;
+  --brand-surface: rgba(234,106,30,0.07);
+
+  /* ── status: kept semantic, tuned for white ───────────── */
+  --good:          #16a34a;
+  --good-text:     #15803d;
+  --good-dim:      rgba(22,163,74,0.10);
+  --good-border:   rgba(22,163,74,0.30);
+
+  --warn:          #d97706;
+  --warn-text:     #b45309;
+  --warn-dim:      rgba(217,119,6,0.10);
+  --warn-border:   rgba(217,119,6,0.30);
+
+  --critical:      #dc2626;
+  --critical-text: #b91c1c;
+  --critical-dim:  rgba(220,38,38,0.09);
+  --critical-border: rgba(220,38,38,0.28);
+
+  /* ── charts: Zentra's blue / pink / green, amber first ── */
+  --chart-1: #2563eb;
+  --chart-2: #ea6a1e;
+  --chart-3: #16a34a;
+  --chart-4: #db2777;
+  --chart-5: #7c3aed;
+  --chart-6: #0891b2;
+
+  /* ── geometry & elevation: soft, low, almost flat ─────── */
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --shadow-sm: 0 1px 2px rgba(12,10,9,0.05);
+  --shadow-md: 0 4px 16px rgba(12,10,9,0.07);
+  --shadow-lg: 0 16px 40px rgba(12,10,9,0.10);
+}
+
+/* ============================================================
+   Components — all scoped to light mode
+   ============================================================ */
+
+/* ── The KPI row ───────────────────────────────────────────
+   Zentra's signature: a row of oversized numbers, most of them
+   greyed back, so the eye lands on the one that matters. Here the
+   coloured .stat-value classes (amber/blue/green/red) stay in
+   colour and the plain ones recede. */
+:root[data-theme="light"] .stat-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  padding: 18px 20px;
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+:root[data-theme="light"] .stat-tile:hover {
+  border-color: var(--border-md);
+  box-shadow: var(--shadow-sm);
+  transform: none;
+}
+:root[data-theme="light"] .stat-tile::after { display: none; }
+
+:root[data-theme="light"] .stat-value {
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--text-faint);       /* recedes unless it carries a hue */
+}
+:root[data-theme="light"] .stat-value.amber { color: var(--warn-text); }
+:root[data-theme="light"] .stat-value.blue  { color: var(--chart-1); }
+:root[data-theme="light"] .stat-value.green { color: var(--good-text); }
+:root[data-theme="light"] .stat-value.red   { color: var(--critical-text); }
+/* The first tile (Total Orders) is the anchor — full black. */
+:root[data-theme="light"] .stats-grid .stat-tile:first-child .stat-value {
+  color: var(--text-primary);
+}
+:root[data-theme="light"] .stat-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  letter-spacing: 0.01em;
+}
+
+/* ── Cards: white, hairline edge, no glow ─────────────────── */
+:root[data-theme="light"] .table-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+:root[data-theme="light"] .table-section::after { display: none; }
+:root[data-theme="light"] .table-heading {
+  letter-spacing: -0.01em;
+}
+
+/* ── Sidebar nav: active item is a solid black pill ──────── */
+:root[data-theme="light"] .nav-item {
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+:root[data-theme="light"] .nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+:root[data-theme="light"] .nav-item.active {
+  background: #0c0a09;
+  color: #ffffff;
+}
+:root[data-theme="light"] .nav-item.active i { color: #ffffff; }
+:root[data-theme="light"] .nav-item.active::before { display: none; }
+
+/* ── Buttons ──────────────────────────────────────────────── */
+:root[data-theme="light"] .btn-primary {
+  background: #0c0a09;
+  border-color: #0c0a09;
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  box-shadow: none;
+}
+:root[data-theme="light"] .btn-primary:hover {
+  background: #292524;
+  border-color: #292524;
+  box-shadow: none;
+}
+:root[data-theme="light"] .btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+}
+:root[data-theme="light"] .btn-secondary:hover {
+  background: var(--bg-raised);
+}
+
+/* ── Filter chips ─────────────────────────────────────────── */
+:root[data-theme="light"] .filter-btn {
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  padding-inline: 14px;
+}
+:root[data-theme="light"] .filter-btn.active {
+  background: #0c0a09;
+  border-color: #0c0a09;
+  color: #ffffff;
+}
+
+/* ── Tables: airy rows, hairline rules ────────────────────── */
+:root[data-theme="light"] .table-header-row {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="light"] tbody tr { border-bottom: 1px solid #f2f1ef; }
+:root[data-theme="light"] tbody tr:hover { background: #fafaf9; }
+
+/* ── Inputs ───────────────────────────────────────────────── */
+:root[data-theme="light"] .scanner-input,
+:root[data-theme="light"] .pp-input {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-md);
+  background: var(--bg-input);
+}
+:root[data-theme="light"] .scanner-input:focus,
+:root[data-theme="light"] .pp-input:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-dim);
+}
+
+/* ============================================================
+   Ask bar — Zentra's docked AI prompt, wired to the real chat
+   ============================================================ */
+.ask-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 12px 14px 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.ask-bar:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-dim);
+}
+.ask-bar .ask-spark {
+  flex: none;
+  font-size: 17px;
+  color: var(--brand);
+  line-height: 1;
+}
+.ask-bar input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 14.5px;
+  color: var(--text-primary);
+}
+.ask-bar input::placeholder { color: var(--text-muted); }
+.ask-bar .ask-hint {
+  flex: none;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-raised);
+}
+@media (max-width: 760px) {
+  .ask-bar .ask-hint { display: none; }
+}

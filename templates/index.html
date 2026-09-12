@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OrderFlow AI — Manufacturing Order Management</title>
+  <!-- Set the theme attribute before any CSS loads/paints, so a saved "light"
+       preference never flashes dark-then-light on load. Defaults to dark
+       (no attribute) when nothing's saved yet, matching the base :root palette. -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem("orderflow-theme");
+        if (saved === "light") document.documentElement.setAttribute("data-theme", "light");
+      } catch (e) {}
+    })();
+  </script>
+  <!-- Fonts, icons and the QR/barcode camera library are self-hosted under static/vendor/ —
+       the app has no dependency on any external CDN at runtime (important for factory-floor
+       networks that may be offline or firewalled). -->
+  <link rel="stylesheet" href="/static/vendor/fonts/fonts.css" />
+  <link rel="stylesheet" href="/static/vendor/tabler-icons/tabler-icons.min.css" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <!-- Theme layers, applied over style.css.
+         theme-violet.css  -> dark mode  (violet on near-black)
+         theme-zentra.css  -> light mode (white cards, amber accent)
+       The Dark/Light toggle switches between the two. Remove either
+       <link> to fall back to the stock theme for that mode. -->
+  <link rel="stylesheet" href="/static/css/theme-violet.css" />
+  <link rel="stylesheet" href="/static/css/theme-haulix.css" />
+  <link rel="stylesheet" href="/static/css/theme-zentra.css" />
+  <link rel="stylesheet" href="/static/css/theme-coral.css" />
+  <link rel="stylesheet" href="/static/css/dashboard-bento.css" />
+  <link rel="stylesheet" href="/static/css/shell-slide.css" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#0b0f18" />
+  <link rel="icon" href="/static/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+  <script src="/static/vendor/html5-qrcode/html5-qrcode.min.js" defer></script>
+</head>
+<body>
+
+<div class="app-shell">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+
+    <div class="sidebar-brand">
+      <div class="brand-icon">
+        <i class="ti ti-cpu" aria-hidden="true"></i>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">OrderFlow <em>AI</em></span>
+        <span class="brand-sub">Manufacturing OS</span>
+      </div>
+    </div>
+
+    <div class="sidebar-scroll">
+
+    <div class="sidebar-search">
+      <div class="sidebar-search-box">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        <input
+          type="text"
+          id="globalSearchInput"
+          placeholder="Search orders, inventory, suppliers…"
+          autocomplete="off"
+          oninput="handleGlobalSearch(this.value)"
+          onfocus="if(this.value.trim().length>=2) handleGlobalSearch(this.value)"
+        />
+        <i class="ti ti-x search-clear" id="searchClearBtn" onclick="clearGlobalSearch()" aria-hidden="true"></i>
+      </div>
+      <div class="search-results-dropdown" id="searchResultsDropdown"></div>
+    </div>
+
+    <div class="sidebar-section-label">Navigation</div>
+
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="showView('chat')" data-view="chat">
+        <i class="ti ti-message-2" aria-hidden="true"></i>
+        <span>Chat</span>
+      </button>
+      <button class="nav-item" onclick="showView('dashboard')" data-view="dashboard">
+        <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+        <span>Dashboard</span>
+      </button>
+      <button class="nav-item" onclick="showView('inventory')" data-view="inventory">
+        <i class="ti ti-package" aria-hidden="true"></i>
+        <span>Inventory</span>
+      </button>
+      <button class="nav-item" onclick="showView('purchasing')" data-view="purchasing">
+        <i class="ti ti-shopping-cart" aria-hidden="true"></i>
+        <span>Purchasing</span>
+        <span class="tab-count" id="poNavCount" style="display:none"></span>
+      </button>
+      <button class="nav-item" onclick="showView('production')" data-view="production">
+        <i class="ti ti-settings-automation" aria-hidden="true"></i>
+        <span>Production</span>
+      </button>
+      <button class="nav-item" onclick="showView('quality')" data-view="quality">
+        <i class="ti ti-shield-check" aria-hidden="true"></i>
+        <span>Quality</span>
+      </button>
+      <button class="nav-item" onclick="showView('reports')" data-view="reports">
+        <i class="ti ti-chart-bar" aria-hidden="true"></i>
+        <span>Reports</span>
+      </button>
+      <button class="nav-item" onclick="showView('notifications')" data-view="notifications">
+        <i class="ti ti-bell" aria-hidden="true"></i>
+        <span>Notifications</span>
+      </button>
+      <button class="nav-item" onclick="showView('integrations')" data-view="integrations">
+        <i class="ti ti-plug" aria-hidden="true"></i>
+        <span>Integrations</span>
+      </button>
+      <button class="nav-item" onclick="showView('rfid')" data-view="rfid">
+        <i class="ti ti-radio" aria-hidden="true"></i>
+        <span>RFID / Scan</span>
+      </button>
+    </nav>
+
+    <div id="accountSection" style="display:none">
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section-label">Account</div>
+      <nav class="sidebar-nav">
+        <button class="nav-item" onclick="showView('profile')" data-view="profile" id="navProfile">
+          <i class="ti ti-user-circle" aria-hidden="true"></i>
+          <span>Profile</span>
+        </button>
+        <button class="nav-item" onclick="showView('admin')" data-view="admin" id="navAdmin" style="display:none">
+          <i class="ti ti-shield-lock" aria-hidden="true"></i>
+          <span>Admin</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Quick Commands</div>
+
+    <div class="quick-cmds">
+      <div class="quick-cmd" onclick="injectCmd('Show me inventory')">
+        <i class="ti ti-package" aria-hidden="true"></i> View inventory
+      </div>
+      <div class="quick-cmd" onclick="injectCmd('Order 100 Steel Rod 20mm by Aug 10')">
+        <i class="ti ti-plus" aria-hidden="true"></i> Place an order
+      </div>
+      <div class="quick-cmd" onclick="injectCmd('Mark order #1 as accepted')">
+        <i class="ti ti-refresh" aria-hidden="true"></i> Update status
+      </div>
+      <div class="quick-cmd" onclick="injectCmd('Log quality for order #1: visual inspection passed')">
+        <i class="ti ti-shield-check" aria-hidden="true"></i> Log quality
+      </div>
+      <div class="quick-cmd" onclick="injectCmd('Show me all orders')">
+        <i class="ti ti-list" aria-hidden="true"></i> List all orders
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="theme-toggle-row">
+        <span class="theme-toggle-label">Appearance</span>
+        <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+          <i class="ti ti-moon" id="themeToggleIcon" aria-hidden="true"></i>
+          <span id="themeToggleText">Dark</span>
+        </button>
+      </div>
+      <div class="auth-widget" id="authWidget">
+        <button class="auth-login-btn" id="authLoginBtn" onclick="openLoginModal()">
+          <i class="ti ti-login" aria-hidden="true"></i> Log in
+        </button>
+        <div class="auth-user-row" id="authUserRow" style="display:none;cursor:pointer" onclick="showView('profile')" title="View profile">
+          <div class="auth-user-info">
+            <span class="auth-user-name" id="authUserName">—</span>
+            <span class="auth-user-role" id="authUserRole">—</span>
+          </div>
+          <button class="auth-logout-btn" onclick="event.stopPropagation(); logout()" title="Log out">
+            <i class="ti ti-logout" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+      <div class="sidebar-footer-info">
+        <span class="dot" id="aiStatusDot"></span>
+        <span id="aiStatusText">Checking AI connection…</span>
+      </div>
+      <div class="sidebar-footer-sub" id="aiStatusModel">&nbsp;</div>
+    </div>
+
+    </div><!-- /sidebar-scroll -->
+
+  </aside>
+
+  <!-- ── LOGIN MODAL ─────────────────────────────────────── -->
+  <div class="modal-overlay" id="loginModal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="ti ti-lock"></i> Log in</h3>
+        <button class="modal-close" onclick="closeLoginModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <p class="modal-hint">Needed for approving purchase orders, payments, and admin actions. Everything else works without logging in.</p>
+      <div class="modal-field">
+        <label>Username</label>
+        <input id="login-username" class="scanner-input" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div class="modal-field">
+        <label>Password</label>
+        <input id="login-password" type="password" class="scanner-input" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="doLogin()"><i class="ti ti-login"></i> Log in</button>
+        <span id="loginMsg" style="font-size:12.5px"></span>
+      </div>
+      <p class="modal-hint" style="margin-top:14px">First run? The default <code>admin</code> login and its one-time password were printed in the server's console output when it started.</p>
+      <p class="modal-hint">New here? <a href="#" onclick="event.preventDefault(); closeLoginModal(); openSignupModal();">Create an account</a></p>
+    </div>
+  </div>
+
+  <!-- ── SIGN UP MODAL (self-service — the "User module" side of auth) ── -->
+  <div class="modal-overlay" id="signupModal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="ti ti-user-plus"></i> Create Account</h3>
+        <button class="modal-close" onclick="closeSignupModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <p class="modal-hint">New accounts start with read-only (viewer) access. An admin can grant you more from the Admin panel afterward.</p>
+      <div class="modal-field">
+        <label>Username</label>
+        <input id="signup-username" class="scanner-input" autocomplete="username" onkeydown="if(event.key==='Enter')doSignup()" />
+      </div>
+      <div class="modal-field">
+        <label>Password</label>
+        <input id="signup-password" type="password" class="scanner-input" placeholder="min 6 characters" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()" />
+      </div>
+      <div class="modal-field">
+        <label>Confirm password</label>
+        <input id="signup-password-confirm" type="password" class="scanner-input" autocomplete="new-password" onkeydown="if(event.key==='Enter')doSignup()" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="doSignup()"><i class="ti ti-user-plus"></i> Create Account</button>
+        <span id="signupMsg" style="font-size:12.5px"></span>
+      </div>
+      <p class="modal-hint" style="margin-top:14px">Already have an account? <a href="#" onclick="event.preventDefault(); closeSignupModal(); openLoginModal();">Log in</a></p>
+    </div>
+  </div>
+
+  <!-- ── EDIT ORDER MODAL ────────────────────────────────── -->
+  <div class="modal-overlay" id="editOrderModal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="ti ti-edit"></i> Edit Order <span id="editOrderIdLabel"></span></h3>
+        <button class="modal-close" onclick="closeEditOrderModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="modal-field">
+        <label>Quantity</label>
+        <input id="edit-order-qty" type="number" min="1" class="scanner-input" />
+      </div>
+      <div class="modal-field">
+        <label>Deadline</label>
+        <input id="edit-order-deadline" type="date" class="scanner-input" />
+      </div>
+      <div class="modal-field">
+        <label>Specs</label>
+        <input id="edit-order-specs" class="scanner-input" placeholder="Optional specifications" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="saveOrderEdit()"><i class="ti ti-check"></i> Save Changes</button>
+        <span id="editOrderMsg" style="font-size:12.5px"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ADMIN: RESET USER PASSWORD MODAL ────────────────── -->
+  <div class="modal-overlay" id="resetPasswordModal" style="display:none">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="ti ti-key"></i> Reset Password</h3>
+        <button class="modal-close" onclick="closeResetPasswordModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <p class="modal-hint">Set a new password for <strong id="resetPwUsername">—</strong>. They'll use it next time they log in — this doesn't require their old password.</p>
+      <div class="modal-field">
+        <label>New password</label>
+        <input id="reset-pw-new" type="password" class="scanner-input" placeholder="min 6 characters" autocomplete="new-password" onkeydown="if(event.key==='Enter')doResetPassword()" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="doResetPassword()"><i class="ti ti-check"></i> Set Password</button>
+        <span id="resetPwMsg" style="font-size:12.5px"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CERTIFICATE OF CONFORMANCE MODAL ───────────────── -->
+  <div class="modal-overlay" id="certModal" style="display:none">
+    <div class="modal-card cert-modal-card" id="certModalCard">
+      <div class="modal-header">
+        <h3><i class="ti ti-certificate"></i> Certificate of Conformance</h3>
+        <button class="modal-close" onclick="closeCertModal()"><i class="ti ti-x"></i></button>
+      </div>
+      <div id="certModalBody"></div>
+      <div class="modal-actions cert-modal-actions">
+        <button class="btn-primary" onclick="window.print()"><i class="ti ti-printer"></i> Print</button>
+        <button class="btn-secondary" onclick="closeCertModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scrim behind the open nav drawer -->
+  <div class="nav-scrim" id="navScrim" onclick="closeNav()" aria-hidden="true"></div>
+
+  <!-- ── MAIN PANEL ─────────────────────────────────────── -->
+  <main class="main-panel">
+
+    <!-- Top bar: hamburger, logo badge, two-line title -->
+    <header class="top-bar">
+      <button class="icon-circle" id="navToggle" onclick="toggleNav()"
+              aria-label="Open navigation" aria-expanded="false">
+        <i class="ti ti-menu-2" aria-hidden="true"></i>
+      </button>
+      <div class="brand-badge"><i class="ti ti-cpu" aria-hidden="true"></i></div>
+      <div class="brand-stack">
+        <span class="brand-line1">OrderFlow AI</span>
+        <span class="brand-line2" id="topBarView">Chat</span>
+      </div>
+    </header>
+
+    <!-- ═══ CHAT VIEW ════════════════════════════════════ -->
+    <div class="view active" id="view-chat">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">AI Order Assistant</h1>
+          <p class="panel-sub">Orders are placed against your inventory catalog — add items in the Inventory tab first</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="startNewConversation()" title="Clear conversation memory and start fresh">
+            <i class="ti ti-plus" aria-hidden="true"></i> New Conversation
+          </button>
+          <span class="status-pill">
+            <span class="dot green pulse"></span>
+            Live
+          </span>
+        </div>
+      </header>
+
+      <div class="chat-body" id="chatMessages">
+        <div class="msg-row ai">
+          <div class="msg-content">
+            <div class="msg-meta">OrderFlow AI <span class="msg-time">now</span></div>
+            <div class="msg-bubble">
+              <p>Welcome to <strong>OrderFlow AI</strong>. Orders can only be placed for items that exist in your inventory catalog.</p>
+              <p style="color:var(--text-muted);font-size:12.5px;">👉 Go to <strong>Inventory</strong> tab to add items first, then come back here to order them.</p>
+              <div class="capability-grid">
+                <div class="cap-item">
+                  <i class="ti ti-package" aria-hidden="true"></i>
+                  <span><strong>Order from inventory</strong><br>"Order 100 Steel Rods by Aug 10"</span>
+                </div>
+                <div class="cap-item">
+                  <i class="ti ti-refresh-alert" aria-hidden="true"></i>
+                  <span><strong>Update status</strong><br>"Mark order #3 as accepted"</span>
+                </div>
+                <div class="cap-item">
+                  <i class="ti ti-radio" aria-hidden="true"></i>
+                  <span><strong>Scan to consume</strong><br>RFID/barcode scans reduce stock &amp; auto-reorder</span>
+                </div>
+                <div class="cap-item">
+                  <i class="ti ti-search" aria-hidden="true"></i>
+                  <span><strong>Check inventory</strong><br>"Show inventory" or "Check Steel Rod stock"</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-footer">
+        <div class="input-container">
+          <textarea
+            id="chatInput"
+            class="chat-textarea"
+            placeholder="e.g. Order 200 Steel Rod 20mm by Sep 1 …"
+            rows="1"
+            onkeydown="handleKey(event)"
+            oninput="autoResize(this)"
+            aria-label="Chat input"
+          ></textarea>
+          <button class="mic-btn" id="micBtn" onclick="toggleVoiceInput()" aria-label="Voice input" title="Speak your order">
+            <i class="ti ti-microphone" aria-hidden="true"></i>
+          </button>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+            <i class="ti ti-send" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div class="input-hint">
+          <i class="ti ti-keyboard" aria-hidden="true"></i>
+          Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line
+          <span id="voiceHint"></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ═══ DASHBOARD VIEW ═══════════════════════════════ -->
+    <div class="view" id="view-dashboard">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Order Dashboard</h1>
+          <p class="panel-sub">Real-time manufacturing order &amp; inventory visibility</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="loadDashboard()">
+            <i class="ti ti-refresh" aria-hidden="true"></i>
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <!-- Hero: today's date + quick action, greeting, and voice input -->
+        <div class="hero-row">
+          <div class="hero-left">
+            <div class="date-badge" id="heroDay">—</div>
+            <div class="date-text" id="heroDate">&nbsp;<span>&nbsp;</span></div>
+            <button class="hero-cta" onclick="showLowStock()">
+              Show low stock
+              <i class="ti ti-arrow-right" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <div class="hero-right">
+            <div class="hero-greet">
+              <h2>Hey, need help? <span aria-hidden="true">&#128075;</span></h2>
+              <p>Just ask me anything!</p>
+            </div>
+            <button class="hero-mic" id="heroMic" onclick="toggleHeroVoice()"
+                    aria-label="Speak your question" title="Speak your question">
+              <i class="ti ti-microphone" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Ask bar — types straight into the AI assistant -->
+        <div class="ask-bar">
+          <i class="ti ti-sparkles ask-spark" aria-hidden="true"></i>
+          <input id="dashAsk" type="text"
+                 aria-label="Ask about your orders and stock"
+                 placeholder="Ask anything — &ldquo;what&rsquo;s running low?&rdquo; or &ldquo;order 200 steel rods by Friday&rdquo;"
+                 autocomplete="off"
+                 onkeydown="if(event.key==='Enter')askFromDashboard()" />
+          <span class="ask-hint">Enter</span>
+        </div>
+
+        <!-- Stat tiles -->
+        <!-- ═══ BENTO GRID — every tile bound to live order/inventory data ═══ -->
+        <div class="bento">
+
+          <!-- Feature tile: the item most in need of attention -->
+          <div class="b-stock">
+            <div class="b-head" style="margin-bottom:6px">
+              <span class="b-label" style="margin:0">Needs attention</span>
+              <span class="b-pill" id="bStockState">—</span>
+            </div>
+            <div class="stock-part" id="bStockPart">—</div>
+            <div class="stock-mat" id="bStockMat">&nbsp;</div>
+            <div class="stock-qty" id="bStockQty">—</div>
+            <div class="b-sub" id="bStockUnit">in stock</div>
+            <div class="b-actions">
+              <button class="b-act-dark" onclick="showView('inventory')">Reorder</button>
+              <button class="b-act-ghost" onclick="showView('rfid')">Scan / consume</button>
+            </div>
+            <div class="b-stock-foot">
+              <span id="bStockReorder">reorder at —</span>
+              <span id="bStockCount">— items tracked</span>
+            </div>
+          </div>
+
+          <!-- Metric: total orders -->
+          <div class="b-m1">
+            <div class="b-label">Total orders</div>
+            <div class="b-big" id="statTotal">—</div>
+            <div class="b-sub" id="bOrdersSub">across all statuses</div>
+          </div>
+
+          <!-- Metric: low stock -->
+          <div class="b-m2">
+            <div class="b-label">Low stock items</div>
+            <div class="b-big" id="statLowStock">—</div>
+            <div class="b-sub" id="bLowSub">at or below reorder point</div>
+          </div>
+
+          <!-- Dark donut: stock health -->
+          <div class="b-donut">
+            <div id="bDonut"></div>
+            <div class="donut-cap">Stock health</div>
+          </div>
+
+          <!-- Access / role -->
+          <div class="b-lock">
+            <div class="b-lock-icon"><i class="ti ti-lock" aria-hidden="true"></i></div>
+            <div class="b-title" id="bRoleName">Not signed in</div>
+            <div class="b-sub" id="bRoleSub">Log in to approve and administer</div>
+          </div>
+
+          <!-- Activity streak -->
+          <div class="b-streak">
+            <div class="b-big" id="bStreakDays">—</div>
+            <div class="b-sub" id="bStreakSub">days with order activity</div>
+            <div class="dot-matrix" id="bStreakDots"></div>
+          </div>
+
+          <!-- Concentric circles: biggest stock holdings -->
+          <div class="b-circles">
+            <div class="b-head">
+              <span class="b-title">Largest holdings</span>
+              <span class="b-pill">by units</span>
+            </div>
+            <div class="circles-wrap" id="bCircles"></div>
+          </div>
+
+          <!-- Activity manager -->
+          <div class="b-activity">
+            <div class="b-head">
+              <span class="b-title">Order activity</span>
+              <span class="b-pill" id="bActCount">—</span>
+            </div>
+            <div class="b-chips" id="bActChips"></div>
+            <div class="act-list" id="bActList"></div>
+          </div>
+
+          <!-- Trend: total units held -->
+          <div class="b-trend">
+            <div class="b-head" style="margin-bottom:6px">
+              <span class="b-title">Total units held</span>
+            </div>
+            <div class="b-big" id="bTrendValue">—</div>
+            <div class="b-sub" id="bTrendSub">across all inventory</div>
+            <div class="spark-head">
+              <span>Order volume &middot; 30 days</span>
+              <span class="b-delta" id="bTrendDelta">—</span>
+            </div>
+            <div class="spark-wrap" id="bTrendSpark"></div>
+          </div>
+
+        </div>
+
+        <!-- Inventory quick summary -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading">Inventory Snapshot</h2>
+            <button class="btn-secondary" onclick="showView('inventory')">
+              View All <i class="ti ti-arrow-right"></i>
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>ID</th><th>Part</th><th>Material</th><th>Stock</th><th>Reorder At</th><th>Status</th><th>Action</th>
+              </tr></thead>
+              <tbody id="inventorySummaryBody">
+                <tr><td colspan="7" class="table-empty"><i class="ti ti-loader"></i> Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Orders table -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading">All Orders</h2>
+            <div class="filter-group" id="filterGroup">
+              <button class="filter-btn active" data-status="all" onclick="filterTable('all', this)">All</button>
+              <button class="filter-btn" data-status="Received" onclick="filterTable('Received', this)">Received</button>
+              <button class="filter-btn" data-status="In Review" onclick="filterTable('In Review', this)">In Review</button>
+              <button class="filter-btn" data-status="Accepted" onclick="filterTable('Accepted', this)">Accepted</button>
+            </div>
+          </div>
+          <div class="saved-views-bar" id="ordersSavedViewsBar" style="padding:10px 20px 0"></div>
+          <div class="table-wrap">
+            <table id="ordersTable">
+              <thead><tr>
+                <th>Order ID</th><th>Part Name</th><th>Material</th><th>Qty</th><th>Deadline</th><th>Status</th><th>Set Status</th><th>Payment</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="ordersTableBody">
+                <tr><td colspan="9" class="table-empty"><i class="ti ti-loader"></i> Loading orders…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             DEMAND & FORECASTING — unified tabbed section
+             ═══════════════════════════════════════════════════════════ -->
+        <div class="demand-shell" id="demandShell">
+
+          <div class="demand-header" id="demandHeader" onclick="toggleDemandSection()">
+            <div class="demand-title">
+              <i class="ti ti-trending-up"></i>
+              Demand &amp; Forecasting
+            </div>
+            <div class="demand-meta">
+              <span class="section-badge" id="demandBadge">Loading…</span>
+              <i class="ti ti-chevron-down demand-chevron" id="demandChevron"></i>
+            </div>
+          </div>
+
+          <div class="demand-content" id="demandContent">
+            <div class="demand-content-inner">
+
+              <div class="demand-tabs" id="demandTabs">
+                <button class="demand-tab active" data-tab="forecast" onclick="setDemandTab('forecast', this)">
+                  <i class="ti ti-chart-line"></i> Forecast
+                </button>
+                <button class="demand-tab" data-tab="predictions" onclick="setDemandTab('predictions', this)">
+                  <i class="ti ti-crystal-ball"></i> Predictions
+                  <span class="tab-count" id="predTabCount" style="display:none"></span>
+                </button>
+                <button class="demand-tab" data-tab="gap" onclick="setDemandTab('gap', this)">
+                  <i class="ti ti-git-compare"></i> Gap Analysis
+                </button>
+                <button class="demand-tab" data-tab="production" onclick="setDemandTab('production', this)">
+                  <i class="ti ti-calendar-event"></i> Production Plan
+                </button>
+                <button class="demand-tab" data-tab="suppliers" onclick="setDemandTab('suppliers', this)">
+                  <i class="ti ti-truck"></i> Suppliers
+                </button>
+              </div>
+
+              <!-- Shared horizon control — used by Forecast + Gap Analysis tabs -->
+              <div class="horizon-row" id="sharedHorizonRow">
+                <span class="horizon-label">Horizon (Forecast &amp; Gap Analysis):</span>
+                <button class="horizon-btn" onclick="setHorizon(7,  this)">7 days</button>
+                <button class="horizon-btn active" onclick="setHorizon(30, this)">30 days</button>
+                <button class="horizon-btn" onclick="setHorizon(60, this)">60 days</button>
+                <button class="horizon-btn" onclick="setHorizon(90, this)">90 days</button>
+              </div>
+
+              <!-- ① FORECAST -->
+              <div class="demand-tab-panel active" id="panel-forecast">
+                <div id="forecastList" class="forecast-list">
+                  <div class="demand-loading"><i class="ti ti-loader"></i> Loading forecast…</div>
+                </div>
+              </div>
+
+              <!-- ② PREDICTIONS -->
+              <div class="demand-tab-panel" id="panel-predictions">
+                <div class="pred-horizon-row-bar">
+                  <span class="pred-horizon-label-txt">Prediction horizon:</span>
+                  <button class="pred-horizon-btn" onclick="setPredHorizon(7,  this)">7 days</button>
+                  <button class="pred-horizon-btn" onclick="setPredHorizon(14, this)">14 days</button>
+                  <button class="pred-horizon-btn active" onclick="setPredHorizon(30, this)">30 days</button>
+                  <button class="pred-horizon-btn" onclick="setPredHorizon(60, this)">60 days</button>
+                  <button class="pred-horizon-btn" onclick="setPredHorizon(90, this)">90 days</button>
+                  <button class="btn-secondary" style="margin-left:auto;font-size:12px;padding:6px 12px" onclick="predLoaded=false;loadPredictions()">
+                    <i class="ti ti-refresh"></i> Recalculate
+                  </button>
+                </div>
+                <div id="predGrid">
+                  <div class="pred-loading-state">
+                    <div class="loader-ring"></div>
+                    <span>Running regression models…</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- ③ GAP ANALYSIS -->
+              <div class="demand-tab-panel" id="panel-gap">
+                <div class="table-wrap">
+                  <table class="gap-table" id="gapTable">
+                    <thead>
+                      <tr>
+                        <th>Part</th><th>Stock</th><th>Needed</th><th>Gap</th><th>Cover</th><th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="gapTableBody">
+                      <tr><td colspan="6" class="demand-loading"><i class="ti ti-loader"></i> Analysing…</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- ④ PRODUCTION PLANNING -->
+              <div class="demand-tab-panel" id="panel-production">
+                <div class="prod-plan-form">
+                  <div>
+                    <label class="pp-label">Part name *</label>
+                    <input id="pp-part" class="pp-input" placeholder="Steel Rod 20mm" />
+                  </div>
+                  <div>
+                    <label class="pp-label">Target qty *</label>
+                    <input id="pp-qty" class="pp-input" type="number" min="1" placeholder="500" />
+                  </div>
+                  <div>
+                    <label class="pp-label">Start date</label>
+                    <input id="pp-start" class="pp-input" type="date" />
+                  </div>
+                  <div>
+                    <label class="pp-label">End date</label>
+                    <input id="pp-end" class="pp-input" type="date" />
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                  <button class="pp-add-btn" onclick="addProductionPlan()">
+                    <i class="ti ti-plus"></i> Add Plan
+                  </button>
+                  <span id="ppMsg" style="font-size:12px;line-height:1.8"></span>
+                </div>
+                <div id="prodPlanList" class="prod-plan-list">
+                  <div class="demand-loading"><i class="ti ti-loader"></i> Loading plans…</div>
+                </div>
+              </div>
+
+              <!-- ⑤ SUPPLIER LEAD TIMES -->
+              <div class="demand-tab-panel" id="panel-suppliers">
+                <div class="supplier-form">
+                  <div>
+                    <label class="pp-label">Supplier name *</label>
+                    <input id="sup-name" class="pp-input" placeholder="Acme Metals Ltd." />
+                  </div>
+                  <div>
+                    <label class="pp-label">Part / item</label>
+                    <input id="sup-part" class="pp-input" placeholder="Steel Rod 20mm" />
+                  </div>
+                  <div>
+                    <label class="pp-label">Lead days</label>
+                    <input id="sup-lead" class="pp-input" type="number" min="1" value="7" placeholder="7" />
+                  </div>
+                  <div>
+                    <label class="pp-label">Reliability %</label>
+                    <input id="sup-rel" class="pp-input" type="number" min="0" max="100" value="90" placeholder="90" />
+                  </div>
+                  <div>
+                    <label class="pp-label">Unit Cost ($)</label>
+                    <input id="sup-cost" class="pp-input" type="number" min="0" step="0.01" placeholder="2.50" />
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+                  <button class="pp-add-btn" onclick="addSupplier()">
+                    <i class="ti ti-plus"></i> Add Supplier
+                  </button>
+                  <span id="supMsg" style="font-size:12px;line-height:1.8"></span>
+                </div>
+                <div id="supplierList" class="supplier-list">
+                  <div class="demand-loading"><i class="ti ti-loader"></i> Loading suppliers…</div>
+                </div>
+              </div>
+
+            </div><!-- /demand-content-inner -->
+          </div><!-- /demand-content -->
+        </div><!-- /demandShell -->
+
+      </div><!-- /dashboard-body -->
+    </div><!-- /view-dashboard -->
+
+    <!-- ═══ INVENTORY VIEW ════════════════════════════════ -->
+    <div class="view" id="view-inventory">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Inventory Catalog</h1>
+          <p class="panel-sub">Add items here first — only catalog items can be ordered via chat</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="loadInventoryView()">
+            <i class="ti ti-refresh"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <!-- ══ ADD INVENTORY ITEM FORM ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Add New Inventory Item</h2>
+          </div>
+          <div class="add-inv-grid">
+            <div class="add-inv-field">
+              <label class="add-inv-label">Part Name <span style="color:var(--critical-text)">*</span></label>
+              <input id="inv-part-name" class="scanner-input" placeholder="e.g. Steel Rod 20mm" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Material</label>
+              <input id="inv-material" class="scanner-input" placeholder="e.g. Steel, Aluminium" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Unit</label>
+              <input id="inv-unit" class="scanner-input" placeholder="pcs / m / kg" value="pcs" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Initial Stock Qty</label>
+              <input id="inv-qty" type="number" min="0" class="scanner-input" placeholder="0" value="0" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Reorder Threshold</label>
+              <input id="inv-reorder" type="number" min="1" class="scanner-input" placeholder="10" value="10" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Barcode (optional)</label>
+              <input id="inv-barcode" class="scanner-input" placeholder="e.g. ORDER-XYZ" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">RFID Tag (optional)</label>
+              <input id="inv-rfid" class="scanner-input" placeholder="e.g. RFID-A3F92C1B" />
+            </div>
+          </div>
+          <div class="inv-form-actions">
+            <button class="btn-primary" onclick="addInventoryItem()">
+              <i class="ti ti-plus"></i> Add to Inventory
+            </button>
+            <button class="btn-secondary" onclick="clearAddForm()">Clear</button>
+            <span id="addInventoryResult" style="font-size:12.5px"></span>
+          </div>
+        </div>
+
+        <!-- ══ BARCODE SCANNER ══ -->
+        <div class="scanner-section">
+          <div class="scanner-header">
+            <h2>
+              <i class="ti ti-barcode" aria-hidden="true"></i>
+              Barcode Scanner
+              <span class="optional-badge">Optional — scan to consume stock</span>
+            </h2>
+          </div>
+          <div class="scanner-grid">
+            <div class="scanner-card">
+              <div class="scanner-title"><i class="ti ti-barcode"></i> Barcode</div>
+              <input type="text" id="barcodeInput" class="scanner-input" placeholder="Scan or type Barcode (e.g. ORDER-SR20)" />
+              <button class="scanner-btn" onclick="lookupBarcode()">Scan Barcode</button>
+              <button class="scanner-btn secondary" onclick="startBarcodeCamera()">Use Camera</button>
+            </div>
+          </div>
+          <div id="reader"></div>
+          <div id="scanResult"></div>
+        </div>
+
+        <!-- ══ ALL INVENTORY TABLE ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading">All Inventory Items</h2>
+            <div style="display:flex;gap:8px;align-items:center">
+              <a class="btn-secondary" href="/api/inventory/export.csv" style="font-size:12px">
+                <i class="ti ti-download"></i> Export CSV
+              </a>
+              <input type="file" id="csvImportInput" accept=".csv" style="display:none" onchange="importInventoryCsv(this)" />
+              <button class="btn-secondary" style="font-size:12px" onclick="document.getElementById('csvImportInput').click()">
+                <i class="ti ti-upload"></i> Import CSV
+              </button>
+              <span id="csvImportMsg" style="font-size:12px"></span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>ID</th><th>Part</th><th>Material</th><th>Unit</th><th>Stock</th><th>Reorder At</th><th>Level</th><th>Status</th><th>Order</th><th>Delete</th>
+              </tr></thead>
+              <tbody id="inventoryTableBody">
+                <tr><td colspan="10" class="table-empty"><i class="ti ti-loader"></i> Loading inventory…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══ WAREHOUSES & LOCATIONS (collapsible) ══ -->
+        <div class="demand-shell" id="warehouseShell">
+          <div class="demand-header" id="warehouseHeader" onclick="toggleWarehouseSection()">
+            <div class="demand-title">
+              <i class="ti ti-building-warehouse"></i>
+              Warehouses &amp; Locations
+            </div>
+            <div class="demand-meta">
+              <i class="ti ti-chevron-down demand-chevron" id="warehouseChevron"></i>
+            </div>
+          </div>
+          <div class="demand-content" id="warehouseContent">
+            <div class="demand-content-inner">
+
+              <p class="modal-hint">Optional — track WHERE stock physically sits across more than one location. Items with no location assignments behave exactly as before (one shared pool).</p>
+
+              <h2 class="table-heading" style="margin-bottom:10px">Warehouses</h2>
+              <div class="add-inv-grid" style="padding:0 0 4px">
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Name</label>
+                  <input id="wh-name" class="scanner-input" placeholder="e.g. Main Warehouse" />
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Address (optional)</label>
+                  <input id="wh-address" class="scanner-input" placeholder="e.g. 12 Industrial Way" />
+                </div>
+              </div>
+              <div class="inv-form-actions" style="padding:12px 0">
+                <button class="btn-primary" onclick="addWarehouse()"><i class="ti ti-plus"></i> Add Warehouse</button>
+                <span id="whCreateMsg" style="font-size:12.5px"></span>
+              </div>
+              <div class="table-wrap" style="margin-bottom:22px">
+                <table>
+                  <thead><tr><th>ID</th><th>Name</th><th>Address</th><th>Delete</th></tr></thead>
+                  <tbody id="warehousesTableBody">
+                    <tr><td colspan="4" class="table-empty">Loading…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <h2 class="table-heading" style="margin-bottom:10px">Assign Stock to a Location</h2>
+              <div class="add-inv-grid" style="padding:0 0 4px">
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Inventory Item</label>
+                  <select id="loc-inventory" class="scanner-input" onchange="loadLocationSummary()">
+                    <option value="">Select item…</option>
+                  </select>
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Warehouse</label>
+                  <select id="loc-warehouse" class="scanner-input">
+                    <option value="">Select warehouse…</option>
+                  </select>
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Quantity here</label>
+                  <input id="loc-qty" type="number" min="0" class="scanner-input" placeholder="0" />
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Reorder at (this location)</label>
+                  <input id="loc-reorder" type="number" min="0" class="scanner-input" placeholder="10" value="10" />
+                </div>
+              </div>
+              <div id="locSummaryNote"></div>
+              <div class="inv-form-actions" style="padding:12px 0">
+                <button class="btn-primary" onclick="assignLocation()"><i class="ti ti-map-pin"></i> Assign</button>
+                <span id="locAssignMsg" style="font-size:12.5px"></span>
+              </div>
+
+              <h2 class="table-heading" style="margin:8px 0 10px">Transfer Between Locations</h2>
+              <div class="add-inv-grid" style="padding:0 0 4px">
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Inventory Item</label>
+                  <select id="xfer-inventory" class="scanner-input">
+                    <option value="">Select item…</option>
+                  </select>
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">From</label>
+                  <select id="xfer-from" class="scanner-input">
+                    <option value="">Select warehouse…</option>
+                  </select>
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">To</label>
+                  <select id="xfer-to" class="scanner-input">
+                    <option value="">Select warehouse…</option>
+                  </select>
+                </div>
+                <div class="add-inv-field">
+                  <label class="add-inv-label">Quantity</label>
+                  <input id="xfer-qty" type="number" min="1" class="scanner-input" placeholder="0" />
+                </div>
+              </div>
+              <div class="inv-form-actions" style="padding:12px 0 20px">
+                <button class="btn-secondary" onclick="transferLocation()"><i class="ti ti-transfer"></i> Transfer</button>
+                <span id="xferMsg" style="font-size:12.5px"></span>
+              </div>
+
+              <h2 class="table-heading" style="margin-bottom:10px">All Locations</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Part</th><th>Warehouse</th><th>Quantity</th><th>Reorder At</th></tr></thead>
+                  <tbody id="locationsTableBody">
+                    <tr><td colspan="4" class="table-empty">Loading…</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ PURCHASING VIEW ══════════════════════════════ -->
+    <div class="view" id="view-purchasing">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Purchasing</h1>
+          <p class="panel-sub">Purchase orders to suppliers — separate from customer/production orders. Auto-generated when stock crosses its reorder point.</p>
+        </div>
+        <div class="header-right">
+          <span class="status-pill" id="paymentModePill" title="Set STRIPE_SECRET_KEY to take real payments">
+            <span class="dot amber"></span>
+            <span id="paymentModeText">Checking payments…</span>
+          </span>
+          <button class="btn-secondary" onclick="loadPurchasing()">
+            <i class="ti ti-refresh"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <!-- ══ CREATE PURCHASE ORDER ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Create Purchase Order</h2>
+          </div>
+          <div class="add-inv-grid">
+            <div class="add-inv-field">
+              <label class="add-inv-label">Inventory Item</label>
+              <select id="po-inventory" class="scanner-input" onchange="loadSupplierCompare()">
+                <option value="">Select item…</option>
+              </select>
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Quantity</label>
+              <input id="po-qty" type="number" min="1" class="scanner-input" placeholder="100" />
+            </div>
+          </div>
+          <div id="poSupplierCompare" style="margin:14px 0"></div>
+          <div class="inv-form-actions">
+            <button class="btn-primary" onclick="createPOFromForm()">
+              <i class="ti ti-shopping-cart"></i> Create PO (best-scored supplier)
+            </button>
+            <span id="poCreateMsg" style="font-size:12.5px"></span>
+          </div>
+          <p class="modal-hint" style="margin-top:10px">Click a specific supplier row below instead to use that one rather than the best-scored match.</p>
+        </div>
+
+        <!-- ══ PURCHASE ORDERS TABLE ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading">Purchase Orders</h2>
+            <div class="filter-group" id="poFilterGroup">
+              <button class="filter-btn active" data-status="all" onclick="filterPOTable('all', this)">All</button>
+              <button class="filter-btn" data-status="pending_approval" onclick="filterPOTable('pending_approval', this)">Needs Approval</button>
+              <button class="filter-btn" data-status="sent" onclick="filterPOTable('sent', this)">Sent</button>
+              <button class="filter-btn" data-status="received" onclick="filterPOTable('received', this)">Received</button>
+            </div>
+          </div>
+          <div class="saved-views-bar" id="poSavedViewsBar" style="padding:10px 20px 0"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>PO ID</th><th>Part</th><th>Qty</th><th>Supplier</th><th>Cost</th><th>Status</th><th>Actions</th>
+              </tr></thead>
+              <tbody id="poTableBody">
+                <tr><td colspan="7" class="table-empty"><i class="ti ti-loader"></i> Loading purchase orders…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══ PAYMENT HISTORY ══ -->
+        <div class="table-section">
+          <div class="table-header-row">
+            <h2 class="table-heading">Payment History</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>ID</th><th>Direction</th><th>Reference</th><th>Amount</th><th>Provider</th><th>Status</th><th>When</th>
+              </tr></thead>
+              <tbody id="paymentsTableBody">
+                <tr><td colspan="7" class="table-empty"><i class="ti ti-loader"></i> Loading payments…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ QUALITY VIEW ═════════════════════════════════ -->
+    <div class="view" id="view-quality">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Quality Control</h1>
+          <p class="panel-sub">Pass/fail inspection checks, defect tracking, and printable certificates of conformance</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="loadQuality()">
+            <i class="ti ti-refresh" aria-hidden="true"></i>
+            Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <!-- ══ LOG QUALITY CHECK ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-clipboard-check" style="margin-right:6px"></i>Log Quality Check</h2>
+          </div>
+          <div class="add-inv-grid">
+            <div class="add-inv-field">
+              <label class="add-inv-label">Order</label>
+              <select id="qc-order" class="scanner-input">
+                <option value="">Select order…</option>
+              </select>
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Result</label>
+              <select id="qc-result" class="scanner-input">
+                <option value="pass">✅ Pass</option>
+                <option value="fail">❌ Fail</option>
+                <option value="conditional">⚠️ Conditional</option>
+              </select>
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Defect Category</label>
+              <input id="qc-defect" class="scanner-input" placeholder="Required if Fail" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Corrective Action</label>
+              <input id="qc-action" class="scanner-input" placeholder="e.g. Rework, Scrap, Re-inspect" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Note</label>
+              <input id="qc-note" class="scanner-input" placeholder="Optional inspection notes" />
+            </div>
+          </div>
+          <div class="inv-form-actions">
+            <button class="btn-primary" onclick="createQualityLog()">
+              <i class="ti ti-shield-check"></i> Log Quality Check
+            </button>
+            <span id="qcCreateMsg" style="font-size:12.5px"></span>
+          </div>
+        </div>
+
+        <!-- ══ CERTIFICATE OF CONFORMANCE ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-certificate" style="margin-right:6px"></i>Certificate of Conformance</h2>
+          </div>
+          <div class="add-inv-grid">
+            <div class="add-inv-field">
+              <label class="add-inv-label">Order</label>
+              <select id="cert-order" class="scanner-input">
+                <option value="">Select order…</option>
+              </select>
+            </div>
+          </div>
+          <div class="inv-form-actions">
+            <button class="btn-secondary" onclick="viewCertificate()">
+              <i class="ti ti-file-certificate"></i> View Certificate
+            </button>
+          </div>
+        </div>
+
+        <!-- ══ QUALITY LOGS TABLE ══ -->
+        <div class="table-section">
+          <div class="table-header-row">
+            <h2 class="table-heading">Quality Logs</h2>
+            <div class="filter-group" id="qcFilterGroup">
+              <button class="filter-btn active" data-status="all" onclick="filterQCTable('all', this)">All</button>
+              <button class="filter-btn" data-status="pass" onclick="filterQCTable('pass', this)">Pass</button>
+              <button class="filter-btn" data-status="fail" onclick="filterQCTable('fail', this)">Fail</button>
+              <button class="filter-btn" data-status="conditional" onclick="filterQCTable('conditional', this)">Conditional</button>
+            </div>
+          </div>
+          <div class="saved-views-bar" id="qcSavedViewsBar" style="padding:10px 20px 0"></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Order</th><th>Part</th><th>Result</th><th>Defect Category</th><th>Corrective Action</th><th>Logged By</th><th>When</th>
+              </tr></thead>
+              <tbody id="qcTableBody">
+                <tr><td colspan="7" class="table-empty"><i class="ti ti-loader"></i> Loading quality logs…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ REPORTS VIEW ═════════════════════════════════ -->
+    <div class="view" id="view-reports">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Reports &amp; Analytics</h1>
+          <p class="panel-sub">Inventory valuation, ABC analysis, supplier scorecards, and order fulfillment time</p>
+        </div>
+        <div class="header-right">
+          <a class="btn-secondary" href="/api/reports/orders.csv">
+            <i class="ti ti-file-spreadsheet" aria-hidden="true"></i> Orders CSV
+          </a>
+          <a class="btn-primary" href="/api/reports/summary.pdf">
+            <i class="ti ti-file-type-pdf" aria-hidden="true"></i> Download PDF Report
+          </a>
+          <button class="btn-secondary" onclick="loadReports()">
+            <i class="ti ti-refresh" aria-hidden="true"></i>
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <!-- Stat tiles -->
+        <div class="stats-grid">
+          <div class="stat-tile">
+            <div class="stat-icon blue"><i class="ti ti-currency-dollar"></i></div>
+            <div class="stat-body">
+              <div class="stat-value" id="repStatValue">—</div>
+              <div class="stat-label">Total Inventory Value</div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-icon green"><i class="ti ti-clock-check"></i></div>
+            <div class="stat-body">
+              <div class="stat-value" id="repStatAvgDays">—</div>
+              <div class="stat-label">Avg Fulfillment (days)</div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-icon neutral"><i class="ti ti-checkbox"></i></div>
+            <div class="stat-body">
+              <div class="stat-value" id="repStatMeasured">—</div>
+              <div class="stat-label">Orders Measured</div>
+            </div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-icon amber"><i class="ti ti-hourglass"></i></div>
+            <div class="stat-body">
+              <div class="stat-value amber" id="repStatOpen">—</div>
+              <div class="stat-label">Open Orders</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ INVENTORY VALUATION / ABC ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-chart-pie" style="margin-right:6px"></i>Inventory Valuation — ABC Analysis</h2>
+            <a class="btn-secondary" href="/api/reports/inventory-valuation.csv" style="font-size:12px">
+              <i class="ti ti-download"></i> Export CSV
+            </a>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Part</th><th>Qty</th><th>Unit Cost</th><th>Value</th><th>% of Value</th><th>Class</th>
+              </tr></thead>
+              <tbody id="valuationTableBody">
+                <tr><td colspan="6" class="table-empty"><i class="ti ti-loader"></i> Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══ SUPPLIER SCORECARD ══ -->
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-award" style="margin-right:6px"></i>Supplier Scorecard</h2>
+            <a class="btn-secondary" href="/api/reports/supplier-scorecard.csv" style="font-size:12px">
+              <i class="ti ti-download"></i> Export CSV
+            </a>
+          </div>
+          <p class="modal-hint" style="padding:0 20px;margin-top:12px">Score blends the on-file reliability rating with real on-time delivery history once a supplier has at least one completed purchase order — new suppliers score on reliability alone.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Supplier</th><th>Part</th><th>Promised Lead</th><th>Actual Lead</th><th>On-Time %</th><th>Reliability</th><th>Completed POs</th><th>Score</th>
+              </tr></thead>
+              <tbody id="scorecardTableBody">
+                <tr><td colspan="8" class="table-empty"><i class="ti ti-loader"></i> Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ══ OLDEST OPEN ORDERS ══ -->
+        <div class="table-section">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-clock-exclamation" style="margin-right:6px"></i>Oldest Open Orders</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Order</th><th>Part</th><th>Status</th><th>Created</th><th>Deadline</th>
+              </tr></thead>
+              <tbody id="oldestOpenTableBody">
+                <tr><td colspan="5" class="table-empty"><i class="ti ti-loader"></i> Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ RFID SCANNER VIEW ════════════════════════════ -->
+    <div class="view" id="view-rfid">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">RFID Scanner</h1>
+          <p class="panel-sub">Optional · scans consume inventory &amp; auto-trigger reorders when stock falls low</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" id="rfidToggleBtn" onclick="toggleRFIDScanner()">
+            <i class="ti ti-player-pause"></i> Pause
+          </button>
+        </div>
+      </header>
+
+      <div class="rfid-body">
+
+        <div class="rfid-status-bar">
+          <span class="rfid-dot rfid-dot--active" id="rfidStatusDot"></span>
+          <span class="rfid-status-text" id="rfidStatusText">Listening for RFID tag…</span>
+          <span class="rfid-last-tag-label">Last tag:</span>
+          <code class="rfid-last-tag" id="rfidLastTag">—</code>
+        </div>
+
+        <div class="rfid-info-card">
+          <div class="rfid-info__title"><i class="ti ti-info-circle"></i> How RFID scanning works in OrderFlow</div>
+          <div class="rfid-info__body">
+            RFID and barcode scanning is <strong>optional</strong> — you can place orders directly via chat.
+            When you <em>do</em> scan a tag, it will:
+            <ol>
+              <li>Look up the matching <strong>inventory item</strong> by RFID tag</li>
+              <li>Reduce stock by 1 unit (consumption event)</li>
+              <li>Check if stock has reached the <strong>reorder threshold</strong></li>
+              <li>If yes — <strong>auto-create a purchase order</strong> for that item</li>
+              <li>Play an audio confirmation beep</li>
+            </ol>
+            Add items with RFID tags in the <strong>Inventory</strong> tab.
+          </div>
+        </div>
+
+        <div class="rfid-panel" id="rfidScanPanel">
+          <div class="rfid-panel__inner">
+            <div class="rfid-panel__icon">
+              <i class="ti ti-radio" aria-hidden="true"></i>
+            </div>
+            <div class="rfid-panel__label">Hold tag near reader or enter tag manually</div>
+            <div class="rfid-manual-row">
+              <input
+                type="text"
+                id="rfidInput"
+                class="rfid-manual-input"
+                placeholder="e.g. RFID-A3F92C1B"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button class="rfid-manual-btn" onclick="lookupRFID()">
+                <i class="ti ti-scan"></i> Scan
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="rfid-result" id="rfidScanResult"></div>
+
+        <div class="rfid-log-section">
+          <div class="rfid-log-header">
+            <span class="rfid-log-title">
+              <i class="ti ti-history"></i>
+              Scan Event Log
+            </span>
+            <button class="btn-secondary" onclick="clearRFIDLog()" style="font-size:12px;padding:5px 11px;">
+              Clear
+            </button>
+          </div>
+          <div class="rfid-event-log" id="rfidEventLog">
+            <div class="rfid-log-empty">No scans yet — waiting for tags…</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ PRODUCTION VIEW ═══════════════════════════════ -->
+    <div class="view" id="view-production">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Production &amp; BOM</h1>
+          <p class="panel-sub">Bills of materials, shop-floor work orders, and machine/downtime tracking</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="loadProduction()">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <div class="demand-tabs" id="prodTabs" style="margin-bottom:16px">
+          <button class="demand-tab active" data-tab="bom" onclick="setProdTab('bom', this)">
+            <i class="ti ti-list-tree"></i> Bill of Materials
+          </button>
+          <button class="demand-tab" data-tab="workorders" onclick="setProdTab('workorders', this)">
+            <i class="ti ti-clipboard-list"></i> Work Orders
+          </button>
+          <button class="demand-tab" data-tab="machines" onclick="setProdTab('machines', this)">
+            <i class="ti ti-settings-automation"></i> Machines
+          </button>
+        </div>
+
+        <!-- BOM TAB -->
+        <div class="demand-tab-panel active" id="prod-panel-bom">
+          <div class="table-section" style="margin-bottom:20px">
+            <div class="table-header-row">
+              <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Add BOM Line</h2>
+            </div>
+            <p class="modal-hint" style="padding:0 20px">Define what a finished item consumes — e.g. "1× Steel Bracket needs 4× Bolt M6." Completing a work order for the parent auto-deducts the components, all-or-nothing (it checks every component has enough stock before touching any of them).</p>
+            <div class="add-inv-grid">
+              <div class="add-inv-field">
+                <label class="add-inv-label">Finished Item (parent)</label>
+                <select id="bom-parent" class="scanner-input"><option value="">Select item…</option></select>
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Component</label>
+                <select id="bom-component" class="scanner-input"><option value="">Select item…</option></select>
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Qty per unit</label>
+                <input id="bom-qty" type="number" min="0.001" step="0.001" class="scanner-input" placeholder="4" />
+              </div>
+            </div>
+            <div class="inv-form-actions">
+              <button class="btn-primary" onclick="addBomLine()"><i class="ti ti-plus"></i> Add to BOM</button>
+              <span id="bomCreateMsg" style="font-size:12.5px"></span>
+            </div>
+          </div>
+
+          <div class="table-section">
+            <div class="table-header-row">
+              <h2 class="table-heading">Bill of Materials</h2>
+              <select id="bom-filter" class="scanner-input" style="max-width:260px" onchange="loadBom()">
+                <option value="">All finished items</option>
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Finished Item</th><th>Component</th><th>Qty / Unit</th><th>Component Stock</th><th>Delete</th></tr></thead>
+                <tbody id="bomTableBody"><tr><td colspan="5" class="table-empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- WORK ORDERS TAB -->
+        <div class="demand-tab-panel" id="prod-panel-workorders">
+          <div class="table-section" style="margin-bottom:20px">
+            <div class="table-header-row">
+              <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Plan a Work Order</h2>
+            </div>
+            <div class="add-inv-grid">
+              <div class="add-inv-field">
+                <label class="add-inv-label">Item to produce</label>
+                <select id="wo-inventory" class="scanner-input"><option value="">Select item…</option></select>
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Quantity</label>
+                <input id="wo-qty" type="number" min="1" class="scanner-input" placeholder="100" />
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Machine (optional)</label>
+                <select id="wo-machine" class="scanner-input"><option value="">Unassigned</option></select>
+              </div>
+            </div>
+            <div class="inv-form-actions">
+              <button class="btn-primary" onclick="addWorkOrder()"><i class="ti ti-plus"></i> Create Work Order</button>
+              <span id="woCreateMsg" style="font-size:12.5px"></span>
+            </div>
+          </div>
+          <div class="table-section">
+            <div class="table-header-row">
+              <h2 class="table-heading">Work Orders</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>WO ID</th><th>Item</th><th>Qty</th><th>Machine</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody id="workOrdersTableBody"><tr><td colspan="6" class="table-empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- MACHINES TAB -->
+        <div class="demand-tab-panel" id="prod-panel-machines">
+          <div class="table-section">
+            <div class="table-header-row">
+              <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Add Machine</h2>
+            </div>
+            <div class="add-inv-grid">
+              <div class="add-inv-field">
+                <label class="add-inv-label">Name</label>
+                <input id="mach-name" class="scanner-input" placeholder="e.g. CNC-1" />
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Location (optional)</label>
+                <input id="mach-location" class="scanner-input" placeholder="e.g. Bay A" />
+              </div>
+            </div>
+            <div class="inv-form-actions">
+              <button class="btn-primary" onclick="addMachine()"><i class="ti ti-plus"></i> Add Machine</button>
+              <span id="machCreateMsg" style="font-size:12.5px"></span>
+            </div>
+            <div class="machine-grid" id="machineGrid">
+              <div class="table-empty">Loading…</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ NOTIFICATIONS VIEW ═══════════════════════════ -->
+    <div class="view" id="view-notifications">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Notifications</h1>
+          <p class="panel-sub">Stockout risk, order status changes, late suppliers, and quality fails — routed to email, SMS, or Slack</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="checkLateSuppliers()">
+            <i class="ti ti-truck" aria-hidden="true"></i> Check Late Suppliers
+          </button>
+          <button class="btn-secondary" onclick="loadNotifications()">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading">Channel Status</h2>
+          </div>
+          <div class="channel-status-grid" id="channelStatusGrid">
+            <div class="table-empty">Loading…</div>
+          </div>
+          <div class="info-banner warn" id="channelConfigHint" style="margin-bottom:18px">
+            <i class="ti ti-info-circle"></i>
+            <div>No channels configured yet — alerts are still generated and logged below, they just won't be delivered anywhere until you set <code>SMTP_*</code>, <code>TWILIO_*</code>, or <code>SLACK_WEBHOOK_URL</code> environment variables. See the README.</div>
+          </div>
+        </div>
+
+        <div class="table-section" style="margin-bottom:20px">
+          <div class="table-header-row">
+            <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Add Notification Rule</h2>
+          </div>
+          <div class="add-inv-grid">
+            <div class="add-inv-field">
+              <label class="add-inv-label">Event</label>
+              <select id="notif-event" class="scanner-input">
+                <option value="stockout_risk">Stockout risk</option>
+                <option value="order_status_change">Order status change</option>
+                <option value="late_supplier">Late supplier</option>
+                <option value="quality_fail">Quality fail</option>
+              </select>
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Channel</label>
+              <select id="notif-channel" class="scanner-input">
+                <option value="email">Email</option>
+                <option value="sms">SMS</option>
+                <option value="slack">Slack</option>
+              </select>
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Target</label>
+              <input id="notif-target" class="scanner-input" placeholder="email@example.com / +1555… / (ignored for Slack)" />
+            </div>
+          </div>
+          <div class="inv-form-actions">
+            <button class="btn-primary" onclick="addNotificationRule()"><i class="ti ti-plus"></i> Add Rule</button>
+            <button class="btn-secondary" onclick="testNotification()"><i class="ti ti-send"></i> Send Test</button>
+            <span id="notifCreateMsg" style="font-size:12.5px"></span>
+          </div>
+          <div class="table-wrap" style="margin-top:6px">
+            <table>
+              <thead><tr><th>Event</th><th>Channel</th><th>Target</th><th>Enabled</th><th>Delete</th></tr></thead>
+              <tbody id="notifSettingsTableBody"><tr><td colspan="5" class="table-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-section">
+          <div class="table-header-row">
+            <h2 class="table-heading">Notification Log</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>When</th><th>Event</th><th>Channel</th><th>Target</th><th>Status</th><th>Message</th></tr></thead>
+              <tbody id="notifLogTableBody"><tr><td colspan="6" class="table-empty">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ INTEGRATIONS VIEW ═════════════════════════════ -->
+    <div class="view" id="view-integrations">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Integrations</h1>
+          <p class="panel-sub">Printable barcode labels, outbound webhooks for ERP/accounting, and scheduled database backups</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="loadIntegrations()">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <div class="demand-tabs" id="intTabs" style="margin-bottom:16px">
+          <button class="demand-tab active" data-tab="webhooks" onclick="setIntTab('webhooks', this)">
+            <i class="ti ti-plug"></i> Webhooks
+          </button>
+          <button class="demand-tab" data-tab="backups" onclick="setIntTab('backups', this)">
+            <i class="ti ti-database"></i> Backups
+          </button>
+          <button class="demand-tab" data-tab="labels" onclick="setIntTab('labels', this)">
+            <i class="ti ti-barcode"></i> Barcode Labels
+          </button>
+        </div>
+
+        <!-- WEBHOOKS TAB -->
+        <div class="demand-tab-panel active" id="int-panel-webhooks">
+          <div class="table-section" style="margin-bottom:20px">
+            <div class="table-header-row">
+              <h2 class="table-heading"><i class="ti ti-plus" style="margin-right:6px"></i>Register Webhook</h2>
+            </div>
+            <p class="modal-hint" style="padding:0 20px">Payloads are signed with HMAC-SHA256 in the <code>X-OrderFlow-Signature</code> header when a secret is set, so your receiver can verify they really came from OrderFlow.</p>
+            <div class="add-inv-grid">
+              <div class="add-inv-field">
+                <label class="add-inv-label">URL</label>
+                <input id="wh-url" class="scanner-input" placeholder="https://your-erp.example.com/hooks/orderflow" />
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Event</label>
+                <select id="wh-event" class="scanner-input">
+                  <option value="order_created">Order created</option>
+                  <option value="order_status_change">Order status change</option>
+                  <option value="purchase_order_received">Purchase order received</option>
+                  <option value="payment_succeeded">Payment succeeded</option>
+                </select>
+              </div>
+              <div class="add-inv-field">
+                <label class="add-inv-label">Secret (optional)</label>
+                <input id="wh-secret" class="scanner-input" placeholder="Used to sign the payload" />
+              </div>
+            </div>
+            <div class="inv-form-actions">
+              <button class="btn-primary" onclick="addWebhook()"><i class="ti ti-plus"></i> Register</button>
+              <span id="whAddMsg" style="font-size:12.5px"></span>
+            </div>
+            <div class="table-wrap" style="margin-top:6px">
+              <table>
+                <thead><tr><th>URL</th><th>Event</th><th>Signed</th><th>Test</th><th>Delete</th></tr></thead>
+                <tbody id="webhooksTableBody"><tr><td colspan="5" class="table-empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="table-section">
+            <div class="table-header-row">
+              <h2 class="table-heading">Delivery Log</h2>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>When</th><th>Event</th><th>URL</th><th>Result</th></tr></thead>
+                <tbody id="webhookLogTableBody"><tr><td colspan="4" class="table-empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- BACKUPS TAB -->
+        <div class="demand-tab-panel" id="int-panel-backups">
+          <div class="table-section">
+            <div class="table-header-row">
+              <h2 class="table-heading">Database Backups</h2>
+              <button class="btn-primary" onclick="runBackupNow()"><i class="ti ti-device-floppy"></i> Back Up Now</button>
+            </div>
+            <p class="modal-hint" style="padding:0 20px">Runs automatically on a schedule (every <code>BACKUP_INTERVAL_HOURS</code>, default 24h), keeping the last <code>BACKUP_RETENTION_COUNT</code> copies (default 14). You can also trigger one on demand here.</p>
+            <span id="backupRunMsg" style="font-size:12.5px;padding:0 20px;display:block;margin-bottom:6px"></span>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Filename</th><th>When</th><th>Size</th><th>Download</th></tr></thead>
+                <tbody id="backupsTableBody"><tr><td colspan="4" class="table-empty">Loading…</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- LABELS TAB -->
+        <div class="demand-tab-panel" id="int-panel-labels">
+          <div class="table-section">
+            <div class="table-header-row">
+              <h2 class="table-heading">Print Barcode Labels</h2>
+              <div style="display:flex;gap:8px">
+                <button class="btn-secondary" style="font-size:12px" onclick="selectAllLabels(true)">Select All</button>
+                <button class="btn-secondary" style="font-size:12px" onclick="selectAllLabels(false)">Clear</button>
+              </div>
+            </div>
+            <p class="modal-hint" style="padding:0 20px">Items without a barcode yet are auto-assigned one (<code>BC000123</code> style) the moment you print their label.</p>
+            <div class="label-select-grid" id="labelSelectGrid">
+              <div class="table-empty">Loading…</div>
+            </div>
+            <div class="inv-form-actions">
+              <button class="btn-primary" onclick="printSelectedLabels()"><i class="ti ti-printer"></i> Print Selected Labels (PDF)</button>
+              <span id="labelPrintMsg" style="font-size:12.5px"></span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ PROFILE VIEW (any logged-in user) ═════════════ -->
+    <div class="view" id="view-profile">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">My Profile</h1>
+          <p class="panel-sub">Your account details and password</p>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <div class="table-section" style="margin-bottom:20px;max-width:560px">
+          <h2 class="table-heading" style="margin-bottom:14px">Account</h2>
+          <div class="profile-info-grid">
+            <div><span class="profile-label">Username</span><span class="profile-value" id="profileUsername">—</span></div>
+            <div><span class="profile-label">Role</span><span class="profile-value" id="profileRole">—</span></div>
+            <div><span class="profile-label">Member since</span><span class="profile-value" id="profileCreated">—</span></div>
+            <div><span class="profile-label">Last login</span><span class="profile-value" id="profileLastLogin">—</span></div>
+          </div>
+          <div class="inv-form-actions" style="margin-top:18px">
+            <button class="btn-secondary" onclick="logout()"><i class="ti ti-logout"></i> Log out</button>
+          </div>
+        </div>
+
+        <!-- Role switcher — only rendered for accounts stored as admin -->
+        <div class="table-section" id="roleSwitchBlock" style="margin-bottom:20px;max-width:560px;display:none">
+          <h2 class="table-heading" style="margin-bottom:6px">Switch Role</h2>
+          <p class="panel-sub" style="margin:0 0 14px">
+            Act as a lower-privilege role to see exactly what operators and viewers get.
+            Your account stays an admin, so you can switch back at any time.
+          </p>
+          <div class="inv-form-actions" style="gap:8px;flex-wrap:wrap;margin-top:0">
+            <button class="btn-secondary" id="roleBtn-admin" onclick="switchRole('admin')">
+              <i class="ti ti-shield-lock"></i> Admin
+            </button>
+            <button class="btn-secondary" id="roleBtn-operator" onclick="switchRole('operator')">
+              <i class="ti ti-tool"></i> Operator
+            </button>
+            <button class="btn-secondary" id="roleBtn-viewer" onclick="switchRole('viewer')">
+              <i class="ti ti-eye"></i> Viewer
+            </button>
+          </div>
+          <div style="margin-top:12px">
+            <span id="roleSwitchMsg" style="font-size:12.5px"></span>
+          </div>
+        </div>
+
+        <div class="table-section" style="max-width:560px">
+          <h2 class="table-heading" style="margin-bottom:14px">Change Password</h2>
+          <div class="modal-field">
+            <label>Current password</label>
+            <input id="pw-old" type="password" class="scanner-input" autocomplete="current-password" />
+          </div>
+          <div class="modal-field">
+            <label>New password</label>
+            <input id="pw-new" type="password" class="scanner-input" placeholder="min 6 characters" autocomplete="new-password" onkeydown="if(event.key==='Enter')changeMyPassword()" />
+          </div>
+          <div class="inv-form-actions">
+            <button class="btn-primary" onclick="changeMyPassword()"><i class="ti ti-lock"></i> Update Password</button>
+            <span id="changePwMsg" style="font-size:12.5px"></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ═══ ADMIN VIEW (admin role only) ═══════════════════ -->
+    <div class="view" id="view-admin">
+
+      <header class="panel-header">
+        <div class="header-left">
+          <h1 class="panel-title">Admin</h1>
+          <p class="panel-sub">User management and the system audit trail — visible to admins only</p>
+        </div>
+        <div class="header-right">
+          <button class="btn-secondary" onclick="loadUsers(); loadAuditLog();">
+            <i class="ti ti-refresh" aria-hidden="true"></i> Refresh
+          </button>
+        </div>
+      </header>
+
+      <div class="dashboard-body">
+
+        <div class="table-section" style="margin-bottom:20px">
+          <h2 class="table-heading" style="margin-bottom:10px">Add User</h2>
+          <div class="add-inv-grid" style="margin-bottom:12px">
+            <div class="add-inv-field">
+              <label class="add-inv-label">Username</label>
+              <input id="user-username" class="scanner-input" placeholder="jsmith" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Password</label>
+              <input id="user-password" type="password" class="scanner-input" placeholder="min 6 characters" />
+            </div>
+            <div class="add-inv-field">
+              <label class="add-inv-label">Role</label>
+              <select id="user-role" class="scanner-input">
+                <option value="operator">operator</option>
+                <option value="admin">admin</option>
+                <option value="viewer">viewer</option>
+              </select>
+            </div>
+          </div>
+          <div class="inv-form-actions">
+            <button class="btn-primary" onclick="createUser()"><i class="ti ti-plus"></i> Add User</button>
+            <span id="userCreateMsg" style="font-size:12.5px"></span>
+          </div>
+        </div>
+
+        <div class="table-section" style="margin-bottom:20px">
+          <h2 class="table-heading" style="margin-bottom:10px">Users</h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Last Login</th><th>Actions</th></tr></thead>
+              <tbody id="usersTableBody">
+                <tr><td colspan="5" class="table-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-section">
+          <h2 class="table-heading" style="margin-bottom:10px">Audit Log <span style="color:var(--text-muted);font-weight:400">(last 300 actions)</span></h2>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead>
+              <tbody id="auditLogBody">
+                <tr><td colspan="5" class="table-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+<script>
+  // Register the PWA service worker — enables "Install app" in supporting
+  // browsers. Safe no-op in browsers without the API (e.g. some embedded
+  // factory-floor kiosks); registration failures are logged, not surfaced.
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/static/service-worker.js").catch(err => {
+        console.warn("Service worker registration failed:", err);
+      });
+    });
+  }
+</script>
+</body>
+</html>

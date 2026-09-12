@@ -1,0 +1,208 @@
+/* ============================================================
+   OrderFlow AI — "Violet" theme layer
+   ------------------------------------------------------------
+   Loaded AFTER style.css, so it only needs to redefine tokens and
+   a handful of component rules. style.css itself is untouched —
+   delete the <link> to this file in templates/index.html and the
+   app returns to the original blue theme exactly as it was.
+
+   What this changes:
+     · surfaces  — navy-tinted dark  ->  near-black with a violet cast
+     · brand     — blue              ->  violet
+     · radii     — 7/11/16/20px      ->  10/14/20/26px (pillowy cards)
+     · borders   — softened
+     · a few components (nav pill, filter chips, stat tiles, buttons)
+   ============================================================ */
+
+:root {
+  /* ── surfaces ─────────────────────────────────────────────
+     Page sits near-black; cards lift off it with a violet cast
+     rather than the previous navy. */
+  --bg-app:        #08070d;
+  --bg-sidebar:    #0b0a12;
+  --bg-panel:      #0b0a12;
+  --bg-card:       #14121d;
+  --bg-card-hover: #191624;
+  --bg-raised:     #1e1a2b;
+  --bg-input:      #100e18;
+  --bg-hover:      rgba(255,255,255,0.04);
+  --bg-active:     rgba(124,92,255,0.12);
+  --overlay:       rgba(4,3,8,0.78);
+
+  /* ── borders — lower contrast, so cards read by fill not outline ── */
+  --border:        rgba(255,255,255,0.06);
+  --border-md:     rgba(255,255,255,0.10);
+  --border-strong: rgba(255,255,255,0.18);
+
+  /* ── text ─────────────────────────────────────────────── */
+  --text-primary:   #f5f3fb;
+  --text-secondary: #9d97b5;
+  --text-muted:     #6b6484;
+  --text-faint:     #453f5a;
+
+  /* ── brand: violet ────────────────────────────────────── */
+  --brand:         #7c5cff;
+  --brand-hover:   #9376ff;
+  --brand-press:   #6546e2;
+  --brand-dim:     rgba(124,92,255,0.15);
+  --brand-border:  rgba(124,92,255,0.38);
+  --brand-text:    #c9baff;
+  --brand-surface: rgba(124,92,255,0.10);
+
+  /* Status hues keep their meanings, but are nudged to sit
+     comfortably against a violet-black ground. */
+  --good-text:     #4ade80;
+  --warn-text:     #ffd166;
+  --critical-text: #ff6b6b;
+
+  /* Chart slot 1 follows the brand so charts match the accent.
+     The rest of the categorical order is unchanged. */
+  --chart-1: #7c5cff;
+  --chart-7: #b98cff;
+
+  /* ── rounder geometry — the single biggest visual cue ──── */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  /* ── elevation — softer, with a faint violet bloom ─────── */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.45);
+  --shadow-lg: 0 20px 56px rgba(0,0,0,0.55);
+}
+
+/* Light mode keeps the violet accent but stays light and legible. */
+:root[data-theme="light"] {
+  --bg-app:        #f4f2fa;
+  --bg-sidebar:    #ffffff;
+  --bg-panel:      #ffffff;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #f7f5fd;
+  --bg-raised:     #f0edf9;
+  --bg-input:      #ffffff;
+  --bg-hover:      rgba(60,40,120,0.05);
+  --bg-active:     rgba(124,92,255,0.12);
+
+  --border:        rgba(40,25,90,0.10);
+  --border-md:     rgba(40,25,90,0.16);
+  --border-strong: rgba(40,25,90,0.28);
+
+  --text-primary:   #15111f;
+  --text-secondary: #514a66;
+  --text-muted:     #7a7391;
+  --text-faint:     #ada6c0;
+
+  --brand-text:     #5b3fd6;
+}
+
+/* ============================================================
+   Component polish — the parts a palette swap alone can't do
+   ============================================================ */
+
+/* Sidebar nav: active item becomes a soft violet pill rather than
+   a flat highlight, with an accent bar to anchor it. */
+.nav-item {
+  border-radius: var(--radius-md);
+}
+.nav-item.active {
+  background: linear-gradient(
+    90deg,
+    rgba(124,92,255,0.20) 0%,
+    rgba(124,92,255,0.07) 100%
+  );
+  color: var(--text-primary);
+  position: relative;
+}
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: var(--brand);
+}
+
+/* Filter chips become fully rounded pills. */
+.filter-btn {
+  border-radius: var(--radius-full);
+  padding-inline: 14px;
+}
+.filter-btn.active,
+.filter-btn[aria-pressed="true"] {
+  background: var(--brand-dim);
+  border-color: var(--brand-border);
+  color: var(--brand-text);
+}
+
+/* Cards and stat tiles: rounder, with a hairline highlight along the
+   top edge so they catch light like the reference. */
+.table-section,
+.stat-tile {
+  border-radius: var(--radius-lg);
+  position: relative;
+}
+/* Hairline highlight along the top edge so cards catch light.
+   Inset from the corners so it doesn't cut across the rounded edge,
+   and drawn behind content (z-index:0) so headings stay clear of it. */
+.table-section::after,
+.stat-tile::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: var(--radius-lg);
+  right: var(--radius-lg);
+  height: 1px;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,0.10) 25%,
+    rgba(255,255,255,0.10) 75%,
+    transparent
+  );
+  pointer-events: none;
+}
+.stat-tile {
+  transition: transform var(--ease), background var(--ease);
+}
+.stat-tile:hover {
+  transform: translateY(-2px);
+  background: var(--bg-card-hover);
+}
+
+/* Primary buttons: violet with a subtle bloom, matching the
+   reference's raised accent buttons. */
+.btn-primary {
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 16px rgba(124,92,255,0.30);
+}
+.btn-primary:hover {
+  box-shadow: 0 6px 22px rgba(124,92,255,0.42);
+}
+.btn-secondary {
+  border-radius: var(--radius-full);
+}
+
+/* Inputs pick up the rounder geometry too. */
+.scanner-input,
+.pp-input {
+  border-radius: var(--radius-md);
+}
+
+/* Optional utility: a gradient feature card, like the promo panel in
+   the reference. Add class="feature-card" to any .table-section. */
+.feature-card {
+  background: linear-gradient(150deg, #7c5cff 0%, #5b3fd6 55%, #3d2a99 100%);
+  border-color: rgba(255,255,255,0.14);
+}
+.feature-card .table-heading,
+.feature-card .panel-sub,
+.feature-card p {
+  color: #ffffff;
+}
+.feature-card .panel-sub,
+.feature-card p {
+  opacity: 0.82;
+}

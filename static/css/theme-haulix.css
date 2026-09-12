@@ -1,0 +1,268 @@
+/* ============================================================
+   OrderFlow AI — "Haulix" operations theme (dark)
+   ------------------------------------------------------------
+   Warm near-black with a lime accent, modelled on fleet-operations
+   dashboards. Scoped to dark mode, so the Dark/Light toggle now
+   switches between:
+
+       dark  -> this (operations: lime on warm black)
+       light -> Zentra (white cards, amber accent)
+
+   Loaded after theme-violet.css, which it supersedes for dark mode.
+   Also defines the gauge + pipeline components used on the dashboard.
+   ============================================================ */
+
+:root {
+  /* ── surfaces: warm neutral black, panels lifted ───────── */
+  --bg-app:        #161618;
+  --bg-sidebar:    #101011;
+  --bg-panel:      #161618;
+  --bg-card:       #1e1e21;
+  --bg-card-hover: #26262a;
+  --bg-raised:     #2a2a2e;
+  --bg-input:      #17171a;
+  --bg-hover:      rgba(255,255,255,0.05);
+  --bg-active:     rgba(197,240,79,0.12);
+  --overlay:       rgba(10,10,11,0.76);
+
+  --border:        rgba(255,255,255,0.075);
+  --border-md:     rgba(255,255,255,0.13);
+  --border-strong: rgba(255,255,255,0.24);
+
+  --text-primary:   #f2f2f0;
+  --text-secondary: #a3a39d;
+  --text-muted:     #72726c;
+  --text-faint:     #4a4a46;
+
+  /* ── brand: lime ──────────────────────────────────────── */
+  --brand:         #c5f04f;
+  --brand-hover:   #d3fb66;
+  --brand-press:   #aad63a;
+  --brand-dim:     rgba(197,240,79,0.14);
+  --brand-border:  rgba(197,240,79,0.40);
+  --brand-text:    #d9f98a;
+  --brand-surface: rgba(197,240,79,0.08);
+
+  --good-text:     #8fe388;
+  --warn-text:     #ffc46b;
+  --critical-text: #ff7a70;
+
+  --chart-1: #c5f04f;
+  --chart-2: #ffc46b;
+  --chart-3: #6bd5c0;
+  --chart-4: #ff7a70;
+  --chart-7: #b6a6ff;
+
+  --radius-sm: 9px;
+  --radius-md: 13px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.45);
+  --shadow-md: 0 8px 24px rgba(0,0,0,0.5);
+  --shadow-lg: 0 20px 56px rgba(0,0,0,0.6);
+}
+
+/* Lime is a light accent, so primary buttons take dark text on it. */
+:root:not([data-theme="light"]) .btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #14140f;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  box-shadow: none;
+}
+:root:not([data-theme="light"]) .btn-primary:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+  box-shadow: 0 4px 18px rgba(197,240,79,0.22);
+}
+:root:not([data-theme="light"]) .btn-primary i { color: #14140f; }
+
+/* Same reasoning applies to every other solid-lime surface: the base
+   stylesheet assumes a dark, saturated --brand and pairs it with white
+   text/icons, which is unreadable against lime. Force dark text on all
+   of them in this theme. */
+:root:not([data-theme="light"]) .msg-row.user .msg-bubble,
+:root:not([data-theme="light"]) .send-btn,
+:root:not([data-theme="light"]) .pp-add-btn,
+:root:not([data-theme="light"]) .pred-order-btn,
+:root:not([data-theme="light"]) .scanner-btn,
+:root:not([data-theme="light"]) .rfid-manual-btn {
+  color: #14140f;
+}
+
+/* Active nav: lime bar + lime label, no purple gradient. */
+:root:not([data-theme="light"]) .nav-item.active {
+  background: var(--brand-dim);
+  color: var(--brand-text);
+}
+:root:not([data-theme="light"]) .nav-item.active::before { background: var(--brand); }
+:root:not([data-theme="light"]) .nav-item.active i { color: var(--brand); }
+
+:root:not([data-theme="light"]) .filter-btn.active {
+  background: var(--brand-dim);
+  border-color: var(--brand-border);
+  color: var(--brand-text);
+}
+
+/* ============================================================
+   Operations components — used in both themes
+   ============================================================ */
+
+.ops-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 18px;
+}
+@media (max-width: 1180px) {
+  .ops-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.ops-panel { padding: 20px 22px 22px; }
+.ops-panel .table-heading { margin-bottom: 4px; }
+.ops-sub {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 0 18px;
+}
+
+/* ── Stock gauges ─────────────────────────────────────────── */
+.gauge-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  gap: 14px;
+}
+.gauge {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 10px 12px;
+  text-align: center;
+}
+.gauge svg { display: block; margin: 0 auto; }
+.gauge-track { stroke: var(--border-md); }
+.gauge-fill  { stroke-linecap: round; transition: stroke-dashoffset var(--ease-slow); }
+.gauge-value {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 600;
+  fill: var(--text-primary);
+}
+.gauge-unit { font-size: 10.5px; fill: var(--text-muted); }
+.gauge-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gauge-meta { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+.gauge-chip {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+}
+.gauge-chip.ok   { color: var(--good-text);     background: var(--good-dim);     border-color: var(--good-border); }
+.gauge-chip.warn { color: var(--warn-text);     background: var(--warn-dim);     border-color: var(--warn-border); }
+.gauge-chip.low  { color: var(--critical-text); background: var(--critical-dim); border-color: var(--critical-border); }
+
+/* ── Order pipeline rows ──────────────────────────────────── */
+.pipeline-list { display: flex; flex-direction: column; gap: 14px; }
+.pipe {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 13px 15px 15px;
+}
+.pipe-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.pipe-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pipe-qty {
+  flex: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.pipe-route {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 9px;
+}
+.pipe-route b { color: var(--text-secondary); font-weight: 600; }
+.pipe-bar {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--border-md);
+  overflow: hidden;
+}
+.pipe-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  transition: width var(--ease-slow);
+}
+.pipe-bar.is-done > span     { background: var(--good); }
+.pipe-bar.is-late > span     { background: var(--critical); }
+.pipe-steps {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 7px;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.pipe-steps span.done { color: var(--text-secondary); }
+.pipe-steps span.at   { color: var(--brand-text); font-weight: 600; }
+
+/* ── Alert strip ──────────────────────────────────────────── */
+.ops-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  background: var(--warn-dim);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text);
+  font-size: 12.5px;
+}
+.ops-alert i { font-size: 15px; flex: none; }
+.ops-alert.ok {
+  background: var(--good-dim);
+  border-color: var(--good-border);
+  color: var(--good-text);
+}
+.ops-empty {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  padding: 18px 0;
+  text-align: center;
+}

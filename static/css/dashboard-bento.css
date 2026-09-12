@@ -1,0 +1,214 @@
+/* ============================================================
+   OrderFlow AI — bento dashboard
+   ------------------------------------------------------------
+   The mixed-size card grid from the reference layout: one wide
+   feature card, stacked metric cards, a dark donut, small utility
+   tiles, then a row of circles / activity / trend.
+
+   Every tile is bound to real order or inventory data — see
+   renderBento() in app.js.
+   ============================================================ */
+
+.bento {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.bento > * {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  min-width: 0;
+}
+
+/* ── row 1 / 2 ─────────────────────────────────────────────── */
+.b-stock   { grid-column: span 4; grid-row: span 2; display: flex; flex-direction: column; }
+.b-m1,
+.b-m2     { grid-column: span 3; }
+.b-donut  { grid-column: span 2; grid-row: span 2;
+            background: #14100e; border-color: #14100e;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.b-lock   { grid-column: span 3; }
+.b-streak { grid-column: span 3; }
+
+/* ── row 3 ─────────────────────────────────────────────────── */
+.b-circles  { grid-column: span 3; }
+.b-activity { grid-column: span 6; }
+.b-trend    { grid-column: span 3; }
+
+@media (max-width: 1180px) {
+  .b-stock   { grid-column: span 6; }
+  .b-m1, .b-m2 { grid-column: span 3; }
+  .b-donut   { grid-column: span 3; grid-row: span 1; }
+  .b-lock, .b-streak { grid-column: span 3; }
+  .b-circles { grid-column: span 5; }
+  .b-activity{ grid-column: span 7; }
+  .b-trend   { grid-column: span 12; }
+}
+@media (max-width: 760px) {
+  .bento { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bento > * { grid-column: span 2 !important; grid-row: auto !important; }
+}
+
+/* ── shared bits ───────────────────────────────────────────── */
+.b-label {
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.b-big {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.b-big small { font-size: 14px; font-weight: 500; color: var(--text-muted); margin-left: 5px; }
+.b-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.b-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 14px;
+}
+.b-title { font-size: 14.5px; font-weight: 600; color: var(--text-primary); }
+.b-pill {
+  font-size: 11.5px; color: var(--text-secondary);
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-full); padding: 4px 11px; white-space: nowrap;
+}
+.b-delta { font-size: 12px; font-weight: 600; }
+.b-delta.up   { color: var(--good-text); }
+.b-delta.down { color: var(--critical-text); }
+
+/* ── feature stock card ────────────────────────────────────── */
+.b-stock .stock-part {
+  font-size: 17px; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 2px;
+}
+.b-stock .stock-mat { font-size: 12.5px; color: var(--text-muted); }
+.b-stock .stock-qty {
+  font-family: var(--mono);
+  font-size: 34px; font-weight: 600; letter-spacing: -0.02em;
+  color: var(--text-primary); margin: 16px 0 2px;
+}
+.b-actions { display: flex; gap: 9px; margin-top: auto; padding-top: 16px; }
+.b-actions button {
+  flex: 1; padding: 10px 14px; border-radius: var(--radius-full);
+  font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer;
+  border: 1px solid transparent; transition: all var(--ease);
+}
+.b-act-dark { background: #14100e; color: #fff; }
+.b-act-dark:hover { background: #2b2422; }
+.b-act-ghost {
+  background: transparent; color: var(--text-primary);
+  border-color: var(--border-md);
+}
+.b-act-ghost:hover { background: var(--bg-raised); }
+.b-stock-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-muted);
+}
+
+/* ── dark donut ────────────────────────────────────────────── */
+.b-donut .donut-cap {
+  font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: rgba(255,255,255,0.5); margin-top: 12px; text-align: center;
+}
+.donut-pct { font-size: 22px; font-weight: 600; fill: #ffffff; }
+.donut-sub { font-size: 9.5px; fill: rgba(255,255,255,0.55); }
+
+/* ── lock / role tile ──────────────────────────────────────── */
+.b-lock-icon {
+  width: 40px; height: 40px; border-radius: 50%;
+  background: var(--bg-raised); color: var(--text-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; margin-bottom: 12px;
+}
+
+/* ── activity dot matrix ───────────────────────────────────── */
+.dot-matrix { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+.dot-matrix i {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-md); display: block;
+}
+.dot-matrix i.on { background: var(--brand); }
+
+/* ── concentric circles ────────────────────────────────────── */
+.circles-wrap { display: flex; justify-content: center; padding: 4px 0 2px; }
+.circle-label { font-size: 11px; font-weight: 600; fill: var(--text-primary); }
+.circle-label.inv { fill: #ffffff; }
+
+/* ── activity list ─────────────────────────────────────────── */
+.b-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.b-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; padding: 5px 11px;
+  border-radius: var(--radius-full);
+  background: var(--bg-raised); border: 1px solid var(--border);
+  color: var(--text-secondary); cursor: pointer;
+  transition: all var(--ease);
+}
+.b-chip:hover { border-color: var(--border-md); }
+.b-chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.b-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.act-list { display: flex; flex-direction: column; gap: 9px; }
+.act-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 13px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-md);
+}
+.act-ico {
+  width: 30px; height: 30px; flex: none; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; background: var(--brand-dim); color: var(--brand);
+}
+.act-main { flex: 1; min-width: 0; }
+.act-name {
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.act-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
+.act-status {
+  flex: none; font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--radius-full);
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.act-empty { font-size: 12.5px; color: var(--text-muted); padding: 16px 0; text-align: center; }
+
+/* ── circle legend ─────────────────────────────────────────── */
+.circle-legend { list-style: none; margin: 12px 0 0; padding: 0; }
+.circle-legend li {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 12px; padding: 3px 0;
+}
+.circle-legend .lg-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.circle-legend .lg-name {
+  flex: 1; min-width: 0; color: var(--text-secondary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.circle-legend .lg-val {
+  flex: none; font-family: var(--mono); font-size: 11.5px;
+  color: var(--text-primary); font-weight: 600;
+}
+.circles-wrap { flex-direction: column; }
+
+/* ── trend sparkline ───────────────────────────────────────── */
+.spark-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-top: 18px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px; color: var(--text-muted);
+}
+.spark-wrap { margin: 4px -6px 0; }
+.spark-empty {
+  font-size: 12px; color: var(--text-muted);
+  padding: 16px 0 6px; text-align: center;
+}

@@ -1,0 +1,295 @@
+/* ============================================================
+   OrderFlow AI — "Coral" theme (light)
+   ------------------------------------------------------------
+   Modelled on soft financial-dashboard layouts: a warm grey page,
+   pure-white rounded cards, one coral accent, near-black pills.
+
+   Loaded after theme-zentra.css, which it supersedes for light mode.
+   Dark mode is untouched (Haulix). Remove the <link> in
+   templates/index.html to fall back to Zentra.
+   ============================================================ */
+
+:root[data-theme="light"] {
+  /* ── surfaces ─────────────────────────────────────────── */
+  --bg-app:        #eceae7;   /* warm grey page behind the cards */
+  --bg-sidebar:    #ffffff;
+  --bg-panel:      #ffffff;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #fbfaf9;
+  --bg-raised:     #f6f5f3;
+  --bg-input:      #f6f5f3;
+  --bg-hover:      rgba(20,16,14,0.045);
+  --bg-active:     rgba(232,86,63,0.10);
+  --overlay:       rgba(30,24,22,0.42);
+
+  --border:        #e6e3df;
+  --border-md:     #d8d4cf;
+  --border-strong: #b0aaa3;
+
+  --text-primary:   #14100e;
+  --text-secondary: #5a524d;
+  --text-muted:     #8d857e;
+  --text-faint:     #bdb6af;
+
+  /* ── brand: coral ─────────────────────────────────────── */
+  --brand:         #e8563f;
+  --brand-hover:   #f2664f;
+  --brand-press:   #cf4630;
+  --brand-dim:     rgba(232,86,63,0.10);
+  --brand-border:  rgba(232,86,63,0.32);
+  --brand-text:    #c2402b;
+  --brand-surface: rgba(232,86,63,0.06);
+
+  --good:          #1f9d55;
+  --good-text:     #157f43;
+  --good-dim:      rgba(31,157,85,0.10);
+  --good-border:   rgba(31,157,85,0.28);
+
+  --warn:          #d98324;
+  --warn-text:     #a8620f;
+  --warn-dim:      rgba(217,131,36,0.11);
+  --warn-border:   rgba(217,131,36,0.30);
+
+  --critical:      #e8563f;
+  --critical-text: #c2402b;
+  --critical-dim:  rgba(232,86,63,0.10);
+  --critical-border: rgba(232,86,63,0.30);
+
+  --chart-1: #e8563f;
+  --chart-2: #f0a08c;
+  --chart-3: #1f9d55;
+  --chart-4: #d98324;
+  --chart-5: #6b5bd2;
+  --chart-6: #2b8fb3;
+
+  /* ── generous, pillowy geometry ───────────────────────── */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 30px;
+
+  --shadow-sm: 0 1px 3px rgba(20,16,14,0.05);
+  --shadow-md: 0 6px 20px rgba(20,16,14,0.07);
+  --shadow-lg: 0 18px 44px rgba(20,16,14,0.10);
+}
+
+/* ── Cards: white, soft, borderless-feeling ──────────────── */
+:root[data-theme="light"] .table-section,
+:root[data-theme="light"] .stat-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+:root[data-theme="light"] .table-section::after,
+:root[data-theme="light"] .stat-tile::after { display: none; }
+:root[data-theme="light"] .stat-tile:hover {
+  border-color: var(--border-md);
+  box-shadow: var(--shadow-sm);
+  transform: none;
+}
+
+/* Stat numbers: large, tight, near-black — colour only for status. */
+:root[data-theme="light"] .stat-value {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+:root[data-theme="light"] .stat-value.amber { color: var(--warn-text); }
+:root[data-theme="light"] .stat-value.blue  { color: var(--text-primary); }
+:root[data-theme="light"] .stat-value.green { color: var(--good-text); }
+:root[data-theme="light"] .stat-value.red   { color: var(--brand); }
+:root[data-theme="light"] .stat-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 5px;
+}
+
+/* ── Buttons: black primary pill, coral for the key action ─ */
+:root[data-theme="light"] .btn-primary {
+  background: #14100e;
+  border-color: #14100e;
+  color: #ffffff;
+  border-radius: var(--radius-full);
+  box-shadow: none;
+}
+:root[data-theme="light"] .btn-primary:hover {
+  background: #2b2422;
+  border-color: #2b2422;
+}
+:root[data-theme="light"] .btn-secondary {
+  background: var(--bg-card);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+}
+:root[data-theme="light"] .btn-secondary:hover { background: var(--bg-raised); }
+
+/* ── Nav: coral-tinted active row ─────────────────────────── */
+:root[data-theme="light"] .nav-item { border-radius: var(--radius-md); }
+:root[data-theme="light"] .nav-item.active {
+  background: var(--brand-dim);
+  color: var(--brand-text);
+}
+:root[data-theme="light"] .nav-item.active i { color: var(--brand); }
+:root[data-theme="light"] .nav-item.active::before { background: var(--brand); }
+
+/* ── Filter chips ─────────────────────────────────────────── */
+:root[data-theme="light"] .filter-btn {
+  border-radius: var(--radius-full);
+  background: var(--bg-raised);
+  border: 1px solid transparent;
+}
+:root[data-theme="light"] .filter-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+}
+
+/* ── Tables ───────────────────────────────────────────────── */
+:root[data-theme="light"] .table-header-row {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+:root[data-theme="light"] tbody tr { border-bottom: 1px solid #f3f1ee; }
+:root[data-theme="light"] tbody tr:hover { background: #faf9f7; }
+
+:root[data-theme="light"] .scanner-input,
+:root[data-theme="light"] .pp-input {
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  border: 1px solid transparent;
+}
+:root[data-theme="light"] .scanner-input:focus,
+:root[data-theme="light"] .pp-input:focus {
+  background: var(--bg-card);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-dim);
+}
+
+/* ============================================================
+   Hero greeting row — date badge, quick action, ask + mic
+   Works in both themes.
+   ============================================================ */
+
+.hero-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.hero-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+.date-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 62px; height: 62px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border-md);
+  background: var(--bg-card);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+.date-text { font-size: 14px; line-height: 1.35; color: var(--text-primary); font-weight: 500; }
+.date-text span { display: block; color: var(--text-muted); font-weight: 400; }
+
+.hero-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: #ffffff;
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--ease), transform var(--ease);
+}
+.hero-cta:hover { background: var(--brand-hover); }
+.hero-cta:active { transform: scale(0.98); }
+
+.hero-right { display: flex; align-items: center; gap: 18px; margin-left: auto; }
+.hero-greet { text-align: right; }
+.hero-greet h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.hero-greet p {
+  margin: 3px 0 0;
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text-faint);
+  letter-spacing: -0.01em;
+}
+@media (max-width: 980px) {
+  .hero-right { margin-left: 0; }
+  .hero-greet { text-align: left; }
+  .hero-greet h2 { font-size: 21px; }
+  .hero-greet p  { font-size: 16px; }
+}
+
+.hero-mic {
+  width: 62px; height: 62px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border-md);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--ease);
+}
+.hero-mic:hover { border-color: var(--brand); color: var(--brand); }
+.hero-mic.recording {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+  animation: heroPulse 1.4s ease-in-out infinite;
+}
+.hero-mic.unsupported { opacity: 0.45; cursor: not-allowed; }
+@keyframes heroPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--brand-dim); }
+  50%      { box-shadow: 0 0 0 12px transparent; }
+}
+
+/* The ask bar sits directly under the greeting. */
+.ask-bar { border-radius: var(--radius-lg); }
+:root[data-theme="light"] .ask-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+:root[data-theme="light"] .ask-bar:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-dim);
+}
+:root[data-theme="light"] .ask-bar .ask-spark { color: var(--brand); }
+
+/* ── Operations panels pick up the softer geometry ────────── */
+:root[data-theme="light"] .gauge,
+:root[data-theme="light"] .pipe {
+  background: var(--bg-raised);
+  border-color: transparent;
+  border-radius: var(--radius-md);
+}

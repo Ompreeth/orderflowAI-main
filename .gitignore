@@ -1,0 +1,9 @@
+# Local secrets / config
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# Local runtime database
+orders.db
