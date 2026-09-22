@@ -293,6 +293,39 @@
     </div>
   </div>
 
+  <!-- ── GENERIC PROMPT MODAL — in-app replacement for window.prompt() ────── -->
+  <div class="modal-overlay" id="appPromptModal" style="display:none">
+    <div class="modal-card" style="width:min(360px, 92vw)">
+      <div class="modal-header">
+        <h3><i class="ti ti-edit-circle"></i> <span id="appPromptTitle">Input</span></h3>
+        <button class="modal-close" onclick="_appPromptCancel()"><i class="ti ti-x"></i></button>
+      </div>
+      <p class="modal-hint" id="appPromptMsg"></p>
+      <div class="modal-field">
+        <input id="appPromptInput" class="scanner-input" onkeydown="if(event.key==='Enter'){_appPromptSubmit()}else if(event.key==='Escape'){_appPromptCancel()}" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="_appPromptSubmit()"><i class="ti ti-check"></i> OK</button>
+        <button class="btn-secondary" onclick="_appPromptCancel()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GENERIC CONFIRM MODAL — in-app replacement for window.confirm() ──── -->
+  <div class="modal-overlay" id="appConfirmModal" style="display:none">
+    <div class="modal-card" style="width:min(380px, 92vw)">
+      <div class="modal-header">
+        <h3><i class="ti ti-help-circle"></i> <span id="appConfirmTitle">Confirm</span></h3>
+        <button class="modal-close" onclick="_appConfirmChoose(false)"><i class="ti ti-x"></i></button>
+      </div>
+      <p class="modal-hint" id="appConfirmMsg"></p>
+      <div class="modal-actions">
+        <button class="btn-primary" id="appConfirmOkBtn" onclick="_appConfirmChoose(true)"><i class="ti ti-check"></i> OK</button>
+        <button class="btn-secondary" id="appConfirmCancelBtn" onclick="_appConfirmChoose(false)">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── CERTIFICATE OF CONFORMANCE MODAL ───────────────── -->
   <div class="modal-overlay" id="certModal" style="display:none">
     <div class="modal-card cert-modal-card" id="certModalCard">

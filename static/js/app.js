@@ -272,6 +272,56 @@ function renderInventoryPicker(msg, items) {
     container.scrollTop = container.scrollHeight;
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// GENERIC MODALS — in-app replacements for window.prompt()/confirm().
+// Native browser dialogs are unstyled and (in the desktop/webview build)
+// show the underlying URL, so every prompt()/confirm() in this file goes
+// through these instead. Both resolve a Promise, so call sites just
+// `await customPrompt(...)` / `await customConfirm(...)`.
+// ═══════════════════════════════════════════════════════════════════
+let _appPromptResolve = null;
+function customPrompt(message, defaultValue = "", title = "Input") {
+    return new Promise((resolve) => {
+        _appPromptResolve = resolve;
+        document.getElementById("appPromptTitle").textContent = title;
+        document.getElementById("appPromptMsg").textContent = message;
+        const input = document.getElementById("appPromptInput");
+        input.value = defaultValue ?? "";
+        document.getElementById("appPromptModal").style.display = "flex";
+        setTimeout(() => { input.focus(); input.select(); }, 0);
+    });
+}
+function _appPromptSubmit() {
+    document.getElementById("appPromptModal").style.display = "none";
+    const val = document.getElementById("appPromptInput").value;
+    const resolve = _appPromptResolve; _appPromptResolve = null;
+    if (resolve) resolve(val);
+}
+function _appPromptCancel() {
+    document.getElementById("appPromptModal").style.display = "none";
+    const resolve = _appPromptResolve; _appPromptResolve = null;
+    if (resolve) resolve(null);
+}
+
+let _appConfirmResolve = null;
+function customConfirm(message, { title = "Confirm", okText = "OK", cancelText = "Cancel", danger = false } = {}) {
+    return new Promise((resolve) => {
+        _appConfirmResolve = resolve;
+        document.getElementById("appConfirmTitle").textContent = title;
+        document.getElementById("appConfirmMsg").textContent = message;
+        const okBtn = document.getElementById("appConfirmOkBtn");
+        okBtn.innerHTML = `<i class="ti ti-check"></i> ${okText}`;
+        okBtn.className = danger ? "btn-danger" : "btn-primary";
+        document.getElementById("appConfirmCancelBtn").textContent = cancelText;
+        document.getElementById("appConfirmModal").style.display = "flex";
+    });
+}
+function _appConfirmChoose(val) {
+    document.getElementById("appConfirmModal").style.display = "none";
+    const resolve = _appConfirmResolve; _appConfirmResolve = null;
+    if (resolve) resolve(val);
+}
+
 // Places an order directly via /api/chat/confirm-order — no LLM round-trip.
 // Used by both picker tables and the dashboard/inventory "Order" buttons.
 // knownQty is set when we already know the intended quantity (disambiguation
@@ -284,7 +334,7 @@ async function confirmOrderFromPicker(invId, partName, availableStock, knownQty)
 
     let qty = knownQty ? parseInt(knownQty) : null;
     if (!qty) {
-        const input = prompt(`How many "${partName}" to order?\n(Available stock: ${availableStock})`, Math.min(50, availableStock));
+        const input = await customPrompt(`How many "${partName}" to order?\n(Available stock: ${availableStock})`, Math.min(50, availableStock), "Order Quantity");
         if (!input || isNaN(parseInt(input))) return;
         qty = parseInt(input);
     }
@@ -295,7 +345,7 @@ async function confirmOrderFromPicker(invId, partName, availableStock, knownQty)
         return;
     }
 
-    const payment_method = confirm(`Payment method for this order:\nOK = Prepaid (pay now)\nCancel = Cash on Delivery`) ? "prepaid" : "cod";
+    const payment_method = (await customConfirm("Payment method for this order:", { title: "Payment Method", okText: "Prepaid", cancelText: "Cash on Delivery" })) ? "prepaid" : "cod";
 
     try {
         const res  = await fetch("/api/chat/confirm-order", {
@@ -1143,7 +1193,7 @@ async function saveOrderEdit() {
 
 async function cancelOrderRow(id, isReturn) {
     const label = isReturn ? "Return" : "Cancel";
-    if (!confirm(`${label} order #${id}? Stock will be restocked and any payment refunded. This can't be undone.`)) return;
+    if (!await customConfirm(`${label} order #${id}? Stock will be restocked and any payment refunded. This can't be undone.`, { title: `${label} Order`, okText: label, danger: true })) return;
     try {
         const res  = await fetch(`/api/orders/${id}/${isReturn ? "return" : "cancel"}`, { method: "POST" });
         const data = await res.json();
@@ -1212,7 +1262,7 @@ function clearAddForm() {
 }
 
 async function deleteInventoryItem(id, name) {
-    if (!confirm(`Delete "${name}" from inventory?\nThis will fail if orders reference this item.`)) return;
+    if (!await customConfirm(`Delete "${name}" from inventory?\nThis will fail if orders reference this item.`, { title: "Delete Item", okText: "Delete", danger: true })) return;
 
     try {
         const res  = await fetch(`/api/inventory/${id}`, { method: "DELETE" });
@@ -1845,7 +1895,7 @@ async function updatePlanStatus(id, status) {
 }
 
 async function deletePlan(id) {
-    if (!confirm("Delete this production plan?")) return;
+    if (!await customConfirm("Delete this production plan?", { title: "Delete Plan", okText: "Delete", danger: true })) return;
     await fetch(`/api/demand/production-plan/${id}`, { method: "DELETE" });
     loadProductionPlans();
 }
@@ -1934,7 +1984,7 @@ async function addSupplier() {
 }
 
 async function deleteSupplier(id) {
-    if (!confirm("Remove this supplier?")) return;
+    if (!await customConfirm("Remove this supplier?", { title: "Remove Supplier", okText: "Remove", danger: true })) return;
     await fetch(`/api/demand/suppliers/${id}`, { method: "DELETE" });
     loadSuppliers();
 }
@@ -2690,7 +2740,7 @@ async function sendPO(id) {
 }
 
 async function receivePO(id, suggestedQty) {
-    const input = prompt(`How many units arrived?`, suggestedQty);
+    const input = await customPrompt("How many units arrived?", suggestedQty, "Receive Purchase Order");
     if (!input || isNaN(parseInt(input))) return;
     const res  = await fetch(`/api/purchase-orders/${id}/receive`, {
         method: "POST",
@@ -2705,7 +2755,7 @@ async function receivePO(id, suggestedQty) {
 }
 
 async function cancelPO(id) {
-    if (!confirm(`Cancel purchase order #${id}?`)) return;
+    if (!await customConfirm(`Cancel purchase order #${id}?`, { title: "Cancel Purchase Order", okText: "Cancel PO", danger: true })) return;
     const res  = await fetch(`/api/purchase-orders/${id}/cancel`, { method: "POST" });
     const data = await res.json();
     if (!res.ok) { alert(data.message); if (res.status === 401) openLoginModal(); return; }
@@ -2713,7 +2763,7 @@ async function cancelPO(id) {
 }
 
 async function payPurchaseOrder(id, amount) {
-    if (!confirm(`Pay $${amount.toFixed(2)} to the supplier for PO #${id}?`)) return;
+    if (!await customConfirm(`Pay $${amount.toFixed(2)} to the supplier for PO #${id}?`, { title: "Pay Supplier", okText: "Pay" })) return;
     const res  = await fetch(`/api/payments/purchase-order/${id}`, { method: "POST" });
     const data = await res.json();
     alert(data.message);
@@ -2722,7 +2772,7 @@ async function payPurchaseOrder(id, amount) {
 }
 
 async function payOrder(id) {
-    const input = prompt("Amount to collect from the customer for this order ($):", "");
+    const input = await customPrompt("Amount to collect from the customer for this order ($):", "", "Collect Payment");
     if (!input || isNaN(parseFloat(input)) || parseFloat(input) <= 0) return;
     const res  = await fetch(`/api/payments/order/${id}`, {
         method: "POST",
@@ -2879,7 +2929,7 @@ async function createUser() {
 }
 
 async function deleteUserRow(id, username) {
-    if (!confirm(`Delete user '${username}'?`)) return;
+    if (!await customConfirm(`Delete user '${username}'?`, { title: "Delete User", okText: "Delete", danger: true })) return;
     const res  = await fetch(`/api/users/${id}`, { method: "DELETE" });
     const data = await res.json();
     if (!res.ok) { alert(data.message); return; }
@@ -3422,7 +3472,7 @@ async function addMachine() {
 }
 
 async function deleteMachine(id) {
-    if (!confirm("Delete this machine?")) return;
+    if (!await customConfirm("Delete this machine?", { title: "Delete Machine", okText: "Delete", danger: true })) return;
     try {
         const res = await fetch(`/api/machines/${id}`, { method: "DELETE" });
         const data = await res.json();
@@ -3432,7 +3482,7 @@ async function deleteMachine(id) {
 }
 
 async function markMachineDown(id) {
-    const reason = prompt("Reason for downtime?") || "Unspecified";
+    const reason = (await customPrompt("Reason for downtime?", "", "Machine Downtime")) || "Unspecified";
     try {
         const res = await fetch(`/api/machines/${id}/downtime`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
         const data = await res.json();
@@ -3676,7 +3726,7 @@ async function addWarehouse() {
 }
 
 async function deleteWarehouse(id) {
-    if (!confirm("Delete this warehouse? Stock still assigned there must be transferred out first.")) return;
+    if (!await customConfirm("Delete this warehouse? Stock still assigned there must be transferred out first.", { title: "Delete Warehouse", okText: "Delete", danger: true })) return;
     try {
         const res  = await fetch(`/api/warehouses/${id}`, { method: "DELETE" });
         const data = await res.json();
