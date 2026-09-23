@@ -322,13 +322,35 @@ function _appConfirmChoose(val) {
     if (resolve) resolve(val);
 }
 
+// Queued so a second call fired while one is already showing (e.g. an
+// error followed immediately by another action) doesn't get silently
+// dropped — it waits and shows right after the current one is dismissed.
+let _appAlertQueue = [];
+let _appAlertShowing = false;
+function customAlert(message, title = "Notice") {
+    _appAlertQueue.push({ message, title });
+    if (!_appAlertShowing) _showNextAlert();
+}
+function _showNextAlert() {
+    const next = _appAlertQueue.shift();
+    if (!next) { _appAlertShowing = false; return; }
+    _appAlertShowing = true;
+    document.getElementById("appAlertTitle").textContent = next.title;
+    document.getElementById("appAlertMsg").textContent = next.message;
+    document.getElementById("appAlertModal").style.display = "flex";
+}
+function _appAlertClose() {
+    document.getElementById("appAlertModal").style.display = "none";
+    _showNextAlert();
+}
+
 // Places an order directly via /api/chat/confirm-order — no LLM round-trip.
 // Used by both picker tables and the dashboard/inventory "Order" buttons.
 // knownQty is set when we already know the intended quantity (disambiguation
 // flow); otherwise the user is prompted.
 async function confirmOrderFromPicker(invId, partName, availableStock, knownQty) {
     if (availableStock === 0) {
-        alert(`❌ "${partName}" is out of stock. No orders can be placed until restocked.`);
+        customAlert(`❌ "${partName}" is out of stock. No orders can be placed until restocked.`);
         return;
     }
 
@@ -339,9 +361,9 @@ async function confirmOrderFromPicker(invId, partName, availableStock, knownQty)
         qty = parseInt(input);
     }
 
-    if (qty <= 0) { alert("❌ Order quantity must be greater than 0."); return; }
+    if (qty <= 0) { customAlert("❌ Order quantity must be greater than 0."); return; }
     if (qty > availableStock) {
-        alert(`❌ Insufficient stock for "${partName}".\nRequested: ${qty} | Available: ${availableStock}\n\nPlease enter a quantity of ${availableStock} or less.`);
+        customAlert(`❌ Insufficient stock for "${partName}".\nRequested: ${qty} | Available: ${availableStock}\n\nPlease enter a quantity of ${availableStock} or less.`);
         return;
     }
 
@@ -1121,10 +1143,10 @@ async function setOrderStatus(orderId, status, btn) {
         if (res.ok) {
             loadDashboard();
         } else {
-            alert(data.message);
+            customAlert(data.message);
         }
     } catch (err) {
-        alert("Error: " + err.message);
+        customAlert("Error: " + err.message);
     }
 }
 
@@ -1197,11 +1219,11 @@ async function cancelOrderRow(id, isReturn) {
     try {
         const res  = await fetch(`/api/orders/${id}/${isReturn ? "return" : "cancel"}`, { method: "POST" });
         const data = await res.json();
-        if (!res.ok) { alert(data.message); return; }
-        alert(data.message);
+        if (!res.ok) { customAlert(data.message); return; }
+        customAlert(data.message);
         loadDashboard();
     } catch (err) {
-        alert("Error: " + err.message);
+        customAlert("Error: " + err.message);
     }
 }
 
@@ -1267,13 +1289,13 @@ async function deleteInventoryItem(id, name) {
     try {
         const res  = await fetch(`/api/inventory/${id}`, { method: "DELETE" });
         const data = await res.json();
-        alert(data.message);
+        customAlert(data.message);
         if (res.ok) {
             loadInventoryView();
             loadDashboard();
         }
     } catch (err) {
-        alert("Error: " + err.message);
+        customAlert("Error: " + err.message);
     }
 }
 
@@ -1418,7 +1440,7 @@ function showReorderAlert(item, reorder) {
 
 async function lookupRFID() {
     const tag = document.getElementById("rfidInput").value.trim();
-    if (!tag) { alert("Please scan or enter an RFID tag"); return; }
+    if (!tag) { customAlert("Please scan or enter an RFID tag"); return; }
     await handleRFIDScan(tag);
 }
 
@@ -1512,7 +1534,7 @@ function clearRFIDLog() {
 
 async function lookupBarcode() {
     const code = document.getElementById("barcodeInput").value.trim();
-    if (!code) { alert("Please scan or enter a barcode"); return; }
+    if (!code) { customAlert("Please scan or enter a barcode"); return; }
 
     try {
         const res  = await fetch(`/api/barcode/${encodeURIComponent(code)}/scan`, {
@@ -1547,7 +1569,7 @@ let qrScanner = null;
 
 function startBarcodeCamera() {
     if (typeof Html5Qrcode === "undefined") {
-        alert("Camera scanner library is still loading — try again in a moment.");
+        customAlert("Camera scanner library is still loading — try again in a moment.");
         return;
     }
     const reader = document.getElementById("reader");
@@ -1564,7 +1586,7 @@ function startBarcodeCamera() {
         }
     ).catch(err => {
         reader.style.display = "none";
-        alert("Could not access camera: " + err);
+        customAlert("Could not access camera: " + err);
     });
 }
 
@@ -2707,7 +2729,7 @@ async function createPOWithSupplier(supplierId) {
     const msg   = document.getElementById("poCreateMsg");
 
     if (!qty || qty <= 0) {
-        alert("Enter a quantity first, then click a supplier row.");
+        customAlert("Enter a quantity first, then click a supplier row.");
         return;
     }
     try {
@@ -2728,14 +2750,14 @@ async function createPOWithSupplier(supplierId) {
 async function approvePO(id) {
     const res  = await fetch(`/api/purchase-orders/${id}/approve`, { method: "POST" });
     const data = await res.json();
-    if (!res.ok) { alert(data.message); if (res.status === 401) openLoginModal(); return; }
+    if (!res.ok) { customAlert(data.message); if (res.status === 401) openLoginModal(); return; }
     loadPurchasing();
 }
 
 async function sendPO(id) {
     const res  = await fetch(`/api/purchase-orders/${id}/send`, { method: "POST" });
     const data = await res.json();
-    if (!res.ok) { alert(data.message); return; }
+    if (!res.ok) { customAlert(data.message); return; }
     loadPurchasing();
 }
 
@@ -2748,7 +2770,7 @@ async function receivePO(id, suggestedQty) {
         body: JSON.stringify({ quantity: parseInt(input) }),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.message); return; }
+    if (!res.ok) { customAlert(data.message); return; }
     loadPurchasing();
     if (document.getElementById("view-inventory")?.classList.contains("active")) loadInventoryView();
     if (document.getElementById("view-dashboard")?.classList.contains("active")) loadDashboard();
@@ -2758,7 +2780,7 @@ async function cancelPO(id) {
     if (!await customConfirm(`Cancel purchase order #${id}?`, { title: "Cancel Purchase Order", okText: "Cancel PO", danger: true })) return;
     const res  = await fetch(`/api/purchase-orders/${id}/cancel`, { method: "POST" });
     const data = await res.json();
-    if (!res.ok) { alert(data.message); if (res.status === 401) openLoginModal(); return; }
+    if (!res.ok) { customAlert(data.message); if (res.status === 401) openLoginModal(); return; }
     loadPurchasing();
 }
 
@@ -2766,7 +2788,7 @@ async function payPurchaseOrder(id, amount) {
     if (!await customConfirm(`Pay $${amount.toFixed(2)} to the supplier for PO #${id}?`, { title: "Pay Supplier", okText: "Pay" })) return;
     const res  = await fetch(`/api/payments/purchase-order/${id}`, { method: "POST" });
     const data = await res.json();
-    alert(data.message);
+    customAlert(data.message);
     if (res.status === 401) { openLoginModal(); return; }
     loadPurchasing();
 }
@@ -2780,7 +2802,7 @@ async function payOrder(id) {
         body: JSON.stringify({ amount: parseFloat(input) }),
     });
     const data = await res.json();
-    alert(data.message);
+    customAlert(data.message);
     if (res.status === 401) { openLoginModal(); return; }
     loadDashboard();
 }
@@ -2859,10 +2881,10 @@ async function updateUserRole(id) {
             body: JSON.stringify({ role }),
         });
         const data = await res.json();
-        if (!res.ok) { alert(data.message); }
+        if (!res.ok) { customAlert(data.message); }
         loadUsers();
     } catch (err) {
-        alert("Error: " + err.message);
+        customAlert("Error: " + err.message);
     }
 }
 
@@ -2932,7 +2954,7 @@ async function deleteUserRow(id, username) {
     if (!await customConfirm(`Delete user '${username}'?`, { title: "Delete User", okText: "Delete", danger: true })) return;
     const res  = await fetch(`/api/users/${id}`, { method: "DELETE" });
     const data = await res.json();
-    if (!res.ok) { alert(data.message); return; }
+    if (!res.ok) { customAlert(data.message); return; }
     loadUsers();
 }
 
@@ -3064,7 +3086,7 @@ async function createQualityLog() {
 
 async function viewCertificate() {
     const orderId = document.getElementById("cert-order")?.value;
-    if (!orderId) { alert("Select an order first."); return; }
+    if (!orderId) { customAlert("Select an order first."); return; }
 
     const body = document.getElementById("certModalBody");
     body.innerHTML = `<div class="demand-loading"><i class="ti ti-loader"></i> Loading…</div>`;
@@ -3410,11 +3432,11 @@ async function woAction(id, action) {
     try {
         const res  = await fetch(`/api/work-orders/${id}/${action}`, { method: "POST" });
         const data = await res.json();
-        if (!res.ok) alert(data.message);
+        if (!res.ok) customAlert(data.message);
         loadWorkOrders();
         if (action === "complete") { loadDashboard(); if (document.getElementById("view-inventory")?.classList.contains("active")) loadInventoryView(); }
     } catch (err) {
-        alert("Error: " + err.message);
+        customAlert("Error: " + err.message);
     }
 }
 
@@ -3476,9 +3498,9 @@ async function deleteMachine(id) {
     try {
         const res = await fetch(`/api/machines/${id}`, { method: "DELETE" });
         const data = await res.json();
-        if (!res.ok) alert(data.message);
+        if (!res.ok) customAlert(data.message);
         loadMachines();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { customAlert("Error: " + err.message); }
 }
 
 async function markMachineDown(id) {
@@ -3486,9 +3508,9 @@ async function markMachineDown(id) {
     try {
         const res = await fetch(`/api/machines/${id}/downtime`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reason }) });
         const data = await res.json();
-        if (!res.ok) alert(data.message);
+        if (!res.ok) customAlert(data.message);
         loadMachines();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { customAlert("Error: " + err.message); }
 }
 
 async function resolveMachineDowntime(downtimeId) {
@@ -3496,9 +3518,9 @@ async function resolveMachineDowntime(downtimeId) {
     try {
         const res = await fetch(`/api/machine-downtime/${downtimeId}/resolve`, { method: "POST" });
         const data = await res.json();
-        if (!res.ok) alert(data.message);
+        if (!res.ok) customAlert(data.message);
         loadMachines();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { customAlert("Error: " + err.message); }
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3636,12 +3658,12 @@ async function checkLateSuppliers() {
     try {
         const res  = await fetch("/api/notifications/check-late-suppliers", { method: "POST" });
         const data = await res.json();
-        alert(data.late.length
+        customAlert(data.late.length
             ? `⚠️ ${data.late.length} of ${data.checked} open PO(s) are running late — alerts sent to any configured channels. See the log below.`
             : `✅ Checked ${data.checked} open PO(s) — none are late.`);
         loadNotificationLog();
     } catch (err) {
-        alert("Error: " + err.message);
+        customAlert("Error: " + err.message);
     }
 }
 
@@ -3730,9 +3752,9 @@ async function deleteWarehouse(id) {
     try {
         const res  = await fetch(`/api/warehouses/${id}`, { method: "DELETE" });
         const data = await res.json();
-        if (!res.ok) { alert(data.message); return; }
+        if (!res.ok) { customAlert(data.message); return; }
         loadWarehouseSection();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { customAlert("Error: " + err.message); }
 }
 
 async function loadLocationSummary() {
@@ -4075,9 +4097,9 @@ async function testWebhook(id) {
     try {
         const res  = await fetch(`/api/webhooks/${id}/test`, { method: "POST" });
         const data = await res.json();
-        alert(data.message);
+        customAlert(data.message);
         loadWebhookLog();
-    } catch (err) { alert("Error: " + err.message); }
+    } catch (err) { customAlert("Error: " + err.message); }
 }
 
 async function loadWebhookLog() {

@@ -326,6 +326,20 @@
     </div>
   </div>
 
+  <!-- ── GENERIC ALERT MODAL — in-app replacement for window.alert() ──────── -->
+  <div class="modal-overlay" id="appAlertModal" style="display:none">
+    <div class="modal-card" style="width:min(380px, 92vw)">
+      <div class="modal-header">
+        <h3><i class="ti ti-bell"></i> <span id="appAlertTitle">Notice</span></h3>
+        <button class="modal-close" onclick="_appAlertClose()"><i class="ti ti-x"></i></button>
+      </div>
+      <p class="modal-hint" id="appAlertMsg"></p>
+      <div class="modal-actions">
+        <button class="btn-primary" onclick="_appAlertClose()"><i class="ti ti-check"></i> OK</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ── CERTIFICATE OF CONFORMANCE MODAL ───────────────── -->
   <div class="modal-overlay" id="certModal" style="display:none">
     <div class="modal-card cert-modal-card" id="certModalCard">
