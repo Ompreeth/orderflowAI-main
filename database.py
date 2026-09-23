@@ -417,4 +417,9 @@ def init_db():
     # amount/timing alone.
     _add_column_if_missing(conn, "payments", "refund_of_payment_id", "INTEGER")
 
+    # Set when a "selling fast + stock under threshold" alert has already
+    # fired for this item, so it doesn't refire on every stock-reducing
+    # action while still under threshold. Cleared once stock recovers.
+    _add_column_if_missing(conn, "inventory", "fast_sell_alerted_at", "TEXT")
+
     conn.close()

@@ -1569,7 +1569,7 @@
       <header class="panel-header">
         <div class="header-left">
           <h1 class="panel-title">Notifications</h1>
-          <p class="panel-sub">Stockout risk, order status changes, late suppliers, and quality fails — routed to email, SMS, or Slack</p>
+          <p class="panel-sub">Stockout risk (incl. fast-selling items dropping below 50% stock), order status changes, late suppliers, and quality fails — routed to email, SMS, or Slack</p>
         </div>
         <div class="header-right">
           <button class="btn-secondary" onclick="checkLateSuppliers()">
@@ -1592,7 +1592,7 @@
           </div>
           <div class="info-banner warn" id="channelConfigHint" style="margin-bottom:18px">
             <i class="ti ti-info-circle"></i>
-            <div>No channels configured yet — alerts are still generated and logged below, they just won't be delivered anywhere until you set <code>SMTP_*</code>, <code>TWILIO_*</code>, or <code>SLACK_WEBHOOK_URL</code> environment variables. See the README.</div>
+            <div>No channels configured yet — alerts are still generated and logged below, they just won't be delivered anywhere until you set <code>SMTP_*</code>, <code>TWILIO_*</code> (SMS/WhatsApp), or <code>SLACK_WEBHOOK_URL</code> environment variables. See the README.</div>
           </div>
         </div>
 
@@ -1615,12 +1615,14 @@
               <select id="notif-channel" class="scanner-input">
                 <option value="email">Email</option>
                 <option value="sms">SMS</option>
+                <option value="whatsapp">WhatsApp</option>
                 <option value="slack">Slack</option>
+                <option value="ntfy">ntfy</option>
               </select>
             </div>
             <div class="add-inv-field">
               <label class="add-inv-label">Target</label>
-              <input id="notif-target" class="scanner-input" placeholder="email@example.com / +1555… / (ignored for Slack)" />
+              <input id="notif-target" class="scanner-input" placeholder="email@example.com / +1555… (SMS & WhatsApp) / ntfy topic / (ignored for Slack)" />
             </div>
           </div>
           <div class="inv-form-actions">

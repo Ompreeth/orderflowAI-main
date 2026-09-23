@@ -10,7 +10,7 @@ import json
 import re
 import math
 import statistics
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # On Windows, stdout/stderr default to a legacy code page (e.g. cp1252) that
 # can't encode the ✅ 🔔 → — characters this app uses all over its log lines.
@@ -439,6 +439,71 @@ def maybe_trigger_reorder(conn, inv_id: int):
     }
 
 
+# A part counts as "selling fast" once it's moved at least this many units
+# in the trailing window below — below that, one small order shouldn't
+# label a slow-moving part as hot just because it also happens to be low.
+FAST_SELL_WINDOW_DAYS = int(os.environ.get("FAST_SELL_WINDOW_DAYS", "7"))
+FAST_SELL_MIN_UNITS = int(os.environ.get("FAST_SELL_MIN_UNITS", "5"))
+FAST_SELL_STOCK_PCT = float(os.environ.get("FAST_SELL_STOCK_PCT", "50"))
+
+
+def maybe_notify_fast_selling_low_stock(conn, inv_id: int):
+    """Alert when a part that's selling fast has burned through half (or
+    more) of what it had at the start of the sales window.
+
+    "Selling fast" and "stock level" only mean something together — a slow
+    part sitting at 40% of its old stock isn't urgent, and a hot part that
+    still has plenty left isn't either. So both are computed from the same
+    baseline: units sold in the last FAST_SELL_WINDOW_DAYS days, plus
+    current stock, approximates what stock was at the start of that window
+    (there's no historical stock-level table to read it from directly).
+    quantity / that baseline <= FAST_SELL_STOCK_PCT% is "at or past half
+    gone"; FAST_SELL_MIN_UNITS sold in the window is the "fast" bar.
+
+    De-duped via inventory.fast_sell_alerted_at so this doesn't refire on
+    every single scan/order while stock stays under the threshold — it
+    resets once the part climbs back out, so a later dip alerts again.
+    """
+    row = conn.execute("SELECT * FROM inventory WHERE id = ?", (inv_id,)).fetchone()
+    if not row:
+        return {"triggered": False}
+
+    since = (datetime.now() - timedelta(days=FAST_SELL_WINDOW_DAYS)).isoformat()
+    sold_recent = conn.execute("""
+        SELECT COALESCE(SUM(quantity), 0) AS total
+        FROM orders
+        WHERE inventory_id = ? AND created_at >= ? AND status NOT IN ('Cancelled', 'Returned')
+    """, (inv_id, since)).fetchone()["total"] or 0
+
+    baseline = row["quantity"] + sold_recent
+    pct_remaining = (row["quantity"] / baseline * 100) if baseline > 0 else 100
+    is_fast = sold_recent >= FAST_SELL_MIN_UNITS
+    is_low = pct_remaining <= FAST_SELL_STOCK_PCT
+
+    if is_fast and is_low:
+        if row["fast_sell_alerted_at"]:
+            return {"triggered": False, "already_alerted": True}
+
+        conn.execute("UPDATE inventory SET fast_sell_alerted_at = ? WHERE id = ?",
+                     (datetime.now().isoformat(), inv_id))
+        conn.commit()
+
+        notify("stockout_risk",
+               f"⚡ Item #{row['id']} — {row['part_name']} is selling fast ({sold_recent} sold in "
+               f"the last {FAST_SELL_WINDOW_DAYS} days) and stock has dropped to {row['quantity']} units "
+               f"({pct_remaining:.0f}% of {baseline}) — below the {FAST_SELL_STOCK_PCT:.0f}% threshold.")
+
+        return {"triggered": True, "inventory_id": row["id"], "part_name": row["part_name"],
+                "sold_recent": sold_recent, "current_stock": row["quantity"],
+                "pct_remaining": round(pct_remaining, 1)}
+
+    if row["fast_sell_alerted_at"]:
+        conn.execute("UPDATE inventory SET fast_sell_alerted_at = NULL WHERE id = ?", (inv_id,))
+        conn.commit()
+
+    return {"triggered": False}
+
+
 # ─────────────────────────────────────────────────────────
 # Page
 # ─────────────────────────────────────────────────────────
@@ -664,6 +729,7 @@ def scan_rfid(tag):
     conn.commit()
 
     reorder = maybe_trigger_reorder(conn, row["id"])
+    maybe_notify_fast_selling_low_stock(conn, row["id"])
 
     conn.execute("""
         INSERT INTO scan_events
@@ -735,6 +801,7 @@ def scan_barcode(code):
     conn.commit()
 
     reorder = maybe_trigger_reorder(conn, row["id"])
+    maybe_notify_fast_selling_low_stock(conn, row["id"])
 
     conn.execute("""
         INSERT INTO scan_events
@@ -956,6 +1023,7 @@ def chat():
             conn.commit()
 
             reorder = maybe_trigger_reorder(conn, inv_row["id"])
+            maybe_notify_fast_selling_low_stock(conn, inv_row["id"])
             conn.close()
 
             dispatch_webhook("order_created", {
@@ -1114,6 +1182,7 @@ def chat():
             conn.execute("UPDATE inventory SET quantity = ? WHERE id = ?", (new_qty, inv_id))
             conn.commit()
             reorder = maybe_trigger_reorder(conn, inv_id)
+            maybe_notify_fast_selling_low_stock(conn, inv_id)
             conn.close()
 
             msg = f"✅ Consumed {qty} × {row['part_name']}. Stock now: {new_qty}"
@@ -1208,6 +1277,7 @@ def confirm_order():
     conn.commit()
 
     reorder = maybe_trigger_reorder(conn, inv_row["id"])
+    maybe_notify_fast_selling_low_stock(conn, inv_row["id"])
     reorder_msg = ""
     if reorder and reorder["triggered"]:
         reorder_msg = (
