@@ -3543,11 +3543,12 @@ async function loadChannelStatus() {
         const res    = await fetch("/api/notifications/channel-status");
         const status = await res.json();
         const icons  = { email: "ti-mail", sms: "ti-message", whatsapp: "ti-brand-whatsapp", slack: "ti-brand-slack", ntfy: "ti-bell-ringing" };
+        const labels = { email: "Email", sms: "SMS", whatsapp: "WhatsApp", slack: "Slack", ntfy: "Notify" };
         grid.innerHTML = Object.keys(status).map(ch => `
             <div class="channel-status-card">
                 <i class="ti ${icons[ch] || 'ti-plug'}"></i>
                 <div>
-                    <div class="channel-status-name">${ch}</div>
+                    <div class="channel-status-name">${labels[ch] || ch}</div>
                     <span class="badge ${status[ch] ? 'badge-accepted' : 'badge-cancelled'}">
                         <span class="badge-dot"></span>${status[ch] ? "Configured" : "Not configured"}
                     </span>
