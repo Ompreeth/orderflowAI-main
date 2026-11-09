@@ -312,6 +312,23 @@ def delete_machine(machine_id):
     if in_use:
         conn.close()
         return jsonify({"message": f"❌ Cannot delete — {in_use} active work order(s) reference this machine"}), 400
+
+    # work_orders.machine_id and machine_downtime.machine_id both have a plain
+    # FK (no ON DELETE CASCADE/SET NULL) — even a completed/cancelled work
+    # order or a past downtime log still blocks the DELETE at the DB level.
+    # The check above only ruled out *active* ones; this catches the rest so
+    # it fails with a clear message instead of an unhandled FK violation.
+    historical = conn.execute(
+        "SELECT COUNT(*) FROM work_orders WHERE machine_id = ?", (machine_id,)
+    ).fetchone()[0]
+    downtime_logs = conn.execute(
+        "SELECT COUNT(*) FROM machine_downtime WHERE machine_id = ?", (machine_id,)
+    ).fetchone()[0]
+    if historical or downtime_logs:
+        conn.close()
+        return jsonify({"message": f"❌ Cannot delete — this machine has {historical} work order(s) and "
+                                    f"{downtime_logs} downtime log(s) on file (including past/completed ones)"}), 400
+
     conn.execute("DELETE FROM machines WHERE id = ?", (machine_id,))
     conn.commit()
     conn.close()

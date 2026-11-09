@@ -130,7 +130,12 @@ Text:
 """
         response = requests.post(
             OLLAMA_URL,
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            # think=False: Qwen3-class models default to emitting a hidden
+            # chain-of-thought before the answer (hundreds of tokens, tens
+            # of seconds, even for a one-word classification) — pure
+            # overhead for these structured-extraction prompts. Ignored
+            # harmlessly by models that don't support hybrid thinking.
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "think": False},
             timeout=30
         )
         return response.json()["response"].strip().lower()
@@ -176,6 +181,10 @@ def translate_to_english(text: str) -> str:
 Rules:
 - Return ONLY the translated text, nothing else.
 - Keep all numbers exactly as they are.
+- Preserve the full sentence, including the request/intent verb (e.g. need,
+  want, order, give me, show me) — never reduce the translation to just a
+  bare quantity and noun phrase (seen with qwen3:8b on Telugu/Kannada input:
+  it was dropping the verb, leaving intent classification to guess).
 - For part/material names, match the closest item from the Known inventory list above if one fits.
 - Do NOT invent or paraphrase inventory terms — use the exact name from the list.
 - If no inventory item matches, translate as literally as possible.
@@ -187,7 +196,12 @@ User message:
     try:
         response = requests.post(
             OLLAMA_URL,
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            # think=False: Qwen3-class models default to emitting a hidden
+            # chain-of-thought before the answer (hundreds of tokens, tens
+            # of seconds, even for a one-word classification) — pure
+            # overhead for these structured-extraction prompts. Ignored
+            # harmlessly by models that don't support hybrid thinking.
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "think": False},
             timeout=60
         )
         translated = response.json()["response"].strip()
@@ -310,7 +324,12 @@ Respond with ONLY this JSON (fill in the values, keep nulls only where truly abs
     try:
         response = requests.post(
             OLLAMA_URL,
-            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False},
+            # think=False: Qwen3-class models default to emitting a hidden
+            # chain-of-thought before the answer (hundreds of tokens, tens
+            # of seconds, even for a one-word classification) — pure
+            # overhead for these structured-extraction prompts. Ignored
+            # harmlessly by models that don't support hybrid thinking.
+            json={"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "think": False},
             timeout=120
         )
         result = response.json()["response"]
@@ -1509,6 +1528,12 @@ def suppliers():
 @app.route("/api/demand/suppliers/<int:sid>", methods=["DELETE"])
 def delete_supplier(sid):
     conn = get_db()
+    in_use = conn.execute(
+        "SELECT COUNT(*) FROM purchase_orders WHERE supplier_id = ?", (sid,)
+    ).fetchone()[0]
+    if in_use:
+        conn.close()
+        return jsonify({"message": f"❌ Cannot delete — {in_use} purchase order(s) reference this supplier"}), 400
     conn.execute("DELETE FROM suppliers WHERE id = ?", (sid,))
     conn.commit()
     conn.close()

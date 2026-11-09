@@ -208,6 +208,12 @@ def create_webhook():
 @integrations_bp.route("/api/webhooks/<int:webhook_id>", methods=["DELETE"])
 def delete_webhook(webhook_id):
     conn = get_db()
+    # webhook_log.webhook_id has a plain FK (no ON DELETE CASCADE/SET NULL),
+    # so deleting a webhook that's ever fired would otherwise hit an
+    # unhandled FK violation. The column is nullable and webhook_log is
+    # already read with a LEFT JOIN, so null it out here instead of losing
+    # the delivery history.
+    conn.execute("UPDATE webhook_log SET webhook_id = NULL WHERE webhook_id = ?", (webhook_id,))
     conn.execute("DELETE FROM webhooks WHERE id = ?", (webhook_id,))
     conn.commit()
     conn.close()
