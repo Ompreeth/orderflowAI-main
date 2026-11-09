@@ -37,7 +37,7 @@
   /* ── text ─────────────────────────────────────────────── */
   --text-primary:   #f5f3fb;
   --text-secondary: #9d97b5;
-  --text-muted:     #6b6484;
+  --text-muted:     #807a95; /* was #6b6484 — lightened for WCAG AA (4.5:1 vs --bg-card) */
   --text-faint:     #453f5a;
 
   /* ── brand: violet ────────────────────────────────────── */
@@ -90,7 +90,7 @@
 
   --text-primary:   #15111f;
   --text-secondary: #514a66;
-  --text-muted:     #7a7391;
+  --text-muted:     #797290; /* was #7a7391 — nudged for WCAG AA (4.5:1 vs --bg-card) */
   --text-faint:     #ada6c0;
 
   --brand-text:     #5b3fd6;

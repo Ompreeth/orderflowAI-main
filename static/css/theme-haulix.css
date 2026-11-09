@@ -31,7 +31,7 @@
 
   --text-primary:   #f2f2f0;
   --text-secondary: #a3a39d;
-  --text-muted:     #72726c;
+  --text-muted:     #868681; /* was #72726c — lightened for WCAG AA (4.5:1 vs --bg-card) */
   --text-faint:     #4a4a46;
 
   /* ── brand: lime ──────────────────────────────────────── */

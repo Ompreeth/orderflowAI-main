@@ -34,7 +34,7 @@
   /* ── text: near-black headline, warm greys beneath ────── */
   --text-primary:   #0c0a09;
   --text-secondary: #57534e;
-  --text-muted:     #8f8880;
+  --text-muted:     #7b756e; /* was #8f8880 — darkened for WCAG AA (4.5:1 vs --bg-card) */
   --text-faint:     #c4bfba;
 
   /* ── brand: amber ─────────────────────────────────────── */

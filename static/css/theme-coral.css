@@ -28,7 +28,7 @@
 
   --text-primary:   #14100e;
   --text-secondary: #5a524d;
-  --text-muted:     #8d857e;
+  --text-muted:     #7c756f; /* was #8d857e — darkened for WCAG AA (4.5:1 vs --bg-card) */
   --text-faint:     #bdb6af;
 
   /* ── brand: coral ─────────────────────────────────────── */

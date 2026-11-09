@@ -625,7 +625,19 @@ function renderBento(orders, inventory) {
     }
 }
 
-const setTxt = (id, val) => { const n = document.getElementById(id); if (n) n.textContent = val; };
+// Updates the text and, only when the value actually changed, replays a
+// brief opacity-flash (see .value-pulse in animations.css) so a live stat
+// ticking over reads as "updated" rather than silently popping.
+const setTxt = (id, val) => {
+    const n = document.getElementById(id);
+    if (!n) return;
+    const next = String(val);
+    if (n.textContent === next) return;
+    n.textContent = next;
+    n.classList.remove("value-pulse");
+    void n.offsetWidth; // restart the animation even if it's still mid-run
+    n.classList.add("value-pulse");
+};
 
 /* Feature tile — whichever item is furthest into trouble. */
 function bentoFeature(inventory) {
@@ -665,16 +677,25 @@ function bentoDonut(inventory) {
     const R = 46, C = 2 * Math.PI * R;
     const stroke = pct >= 80 ? "var(--good)" : pct >= 50 ? "var(--warn)" : "var(--critical)";
 
+    // Ring starts fully empty, then the next frame animates it (via the
+    // CSS transition on .donut-progress in animations.css) sweeping up to
+    // its real value — a static sweep looks livelier than popping straight
+    // to the final arc on every render.
     host.innerHTML = `
       <svg width="120" height="120" viewBox="0 0 120 120" role="img"
            aria-label="${pct}% of items above their reorder point">
         <circle cx="60" cy="60" r="${R}" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="11"></circle>
-        <circle cx="60" cy="60" r="${R}" fill="none" stroke="${stroke}" stroke-width="11"
+        <circle class="donut-progress" cx="60" cy="60" r="${R}" fill="none" stroke="${stroke}" stroke-width="11"
                 stroke-linecap="round" transform="rotate(-90 60 60)"
-                stroke-dasharray="${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}"></circle>
+                stroke-dasharray="0 ${C.toFixed(1)}"></circle>
         <text class="donut-pct" x="60" y="58" text-anchor="middle">${pct}%</text>
         <text class="donut-sub" x="60" y="74" text-anchor="middle">${ok} of ${total} ok</text>
       </svg>`;
+
+    const ring = host.querySelector(".donut-progress");
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (ring) ring.setAttribute("stroke-dasharray", `${(C * pct / 100).toFixed(1)} ${C.toFixed(1)}`);
+    }));
 }
 
 /* Access tile — mirrors whatever the session currently is. */
