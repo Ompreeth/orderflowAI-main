@@ -1,0 +1,221 @@
+{
+ "model": "qwen3:8b",
+ "endpoint": "http://localhost:11434/api/generate",
+ "n_items": 58,
+ "runs": 1,
+ "errors": 0,
+ "intent_accuracy": 1.0,
+ "intent_accuracy_per_run": [
+  1.0
+ ],
+ "intent_accuracy_stdev": 0.0,
+ "macro_f1": 0.2222,
+ "per_intent": {
+  "create_order": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  },
+  "update_status": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0,
+   "support": 32
+  },
+  "query_order": {
+   "precision": 1.0,
+   "recall": 1.0,
+   "f1": 1.0,
+   "support": 26
+  },
+  "list_orders": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  },
+  "log_quality": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  },
+  "list_inventory": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  },
+  "query_inventory": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  },
+  "consume_stock": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  },
+  "report_query": {
+   "precision": 0.0,
+   "recall": 0.0,
+   "f1": 0.0,
+   "support": 0
+  }
+ },
+ "accuracy_by_language": {
+  "en": 1.0,
+  "hi": 1.0,
+  "kn": 1.0,
+  "ta": 1.0
+ },
+ "slot_accuracy": {
+  "part_name (order/stock intents)": null,
+  "quantity": 1.0,
+  "order_id (order-referencing intents)": 1.0,
+  "new_status (update_status only)": 0.9375,
+  "deadline_presence": 1.0
+ },
+ "latency_ms": {
+  "mean": 19102.2,
+  "median": 18732.0,
+  "p95": 20077.3,
+  "min": 17082.1,
+  "max": 46989.2,
+  "total_seconds": 1107.9
+ },
+ "rule_fallback": {
+  "english_report_queries": 0,
+  "answered": 0,
+  "coverage_pct": null,
+  "database_error": null
+ },
+ "confusion_matrix": {
+  "labels_actual": [
+   "create_order",
+   "update_status",
+   "query_order",
+   "list_orders",
+   "log_quality",
+   "list_inventory",
+   "query_inventory",
+   "consume_stock",
+   "report_query"
+  ],
+  "labels_predicted": [
+   "create_order",
+   "update_status",
+   "query_order",
+   "list_orders",
+   "log_quality",
+   "list_inventory",
+   "query_inventory",
+   "consume_stock",
+   "report_query"
+  ],
+  "matrix": [
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    32,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    26,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  ]
+ }
+}
