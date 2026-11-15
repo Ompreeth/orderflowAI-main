@@ -287,14 +287,22 @@ Return ONLY valid JSON with NO extra text, explanation, or markdown.
 
 Intents:
   create_order    - user wants to order / buy / get / need items
-  update_status   - update or advance an order status
-  query_order     - check details of a specific order
+  update_status   - CHANGE an order's status (mark / set / move / advance / approve / accept it)
+  query_order     - READ an existing order: its current status, details or progress
   list_orders     - list all orders
   log_quality     - log a quality note for an order
   list_inventory  - show all inventory
   query_inventory - check stock of a specific item
   consume_stock   - consume / use stock from inventory
   report_query    - a reporting/analytics question (inventory value, fulfillment time, best supplier, low stock, open orders)
+
+Telling a read apart from a write:
+  - A QUESTION about an order is query_order, never update_status.
+    "what's the status of order 14", "order 88 status?", "how is order 5 doing",
+    "has order 21 shipped", "where is order 38" -> query_order
+  - Only an INSTRUCTION to change an order is update_status.
+    "mark order 14 as accepted", "move order 21 forward", "approve order 38" -> update_status
+  - The word "status" on its own does NOT mean update_status.
 
 Rules for part_name:
   - ALWAYS extract the item name from the message.
